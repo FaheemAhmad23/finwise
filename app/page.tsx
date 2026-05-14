@@ -2,148 +2,223 @@
 
 import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import ExpenseManager from '@/components/expense/expense-manager';
 import DebtManager from '@/components/debt/debt-manager';
 import BillSplit from '@/components/bill/bill-split';
 import ClientsManager from '@/components/clients/clients-manager';
-import { LogOut, Download } from 'lucide-react';
+import InvoiceManager from '@/components/invoices/invoice-manager';
+import {
+  LayoutDashboard, Receipt, Users, CreditCard, SplitSquareVertical,
+  LogOut, Download, Menu, X, ChevronRight,
+} from 'lucide-react';
+
+const NAV = [
+  { id: 'expenses',  label: 'Expenses',  icon: LayoutDashboard, emoji: '📊' },
+  { id: 'invoices',  label: 'Invoices',  icon: Receipt,         emoji: '🧾' },
+  { id: 'clients',   label: 'Clients',   icon: Users,           emoji: '👥' },
+  { id: 'debts',     label: 'Debts',     icon: CreditCard,      emoji: '💳' },
+  { id: 'bills',     label: 'Bill Split',icon: SplitSquareVertical, emoji: '💸' },
+];
 
 export default function Home() {
   const { data: session } = useSession();
+  const [page, setPage]           = useState('expenses');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const currency = (session?.user as any)?.currency || 'PKR';
 
-  const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
+  const handleRefresh = () => setRefreshTrigger(p => p + 1);
+
+  const navigate = (id: string) => {
+    setPage(id);
+    setDrawerOpen(false);
+  };
 
   const handleExportCSV = () => {
-    const now = new Date();
+    const now   = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     window.location.href = `/api/export?format=csv&month=${month}`;
   };
 
-  const TABS = [
-    { value: 'expense', icon: '📊', label: 'Expenses' },
-    { value: 'invoices', icon: '🧾', label: 'Invoices', badge: 'Soon' },
-    { value: 'clients', icon: '👥', label: 'Clients' },
-    { value: 'debt',    icon: '💳', label: 'Debts' },
-    { value: 'bill',    icon: '💸', label: 'Bills' },
-  ];
+  const current = NAV.find(n => n.id === page)!;
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="container mx-auto py-4 px-4 md:px-8 max-w-4xl">
+    <div className="min-h-screen bg-background flex">
 
-        {/* Header */}
-        <header className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5 mb-1">
-              <span className="text-3xl">💰</span>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-none">FinWise</h1>
-                <span className="text-[10px] font-bold tracking-widest text-primary uppercase">Pro</span>
-              </div>
+      {/* ── Desktop Sidebar ───────────────────────────────────── */}
+      <aside className="hidden md:flex flex-col w-56 bg-card border-r border-border fixed top-0 left-0 h-full z-30">
+        {/* Logo */}
+        <div className="p-5 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">💰</span>
+            <div>
+              <p className="text-lg font-bold text-foreground leading-none">FinWise</p>
+              <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Pro</p>
             </div>
-            {session?.user && (
-              <p className="text-sm text-muted-foreground">
-                Welcome back,{' '}
-                <span className="font-medium text-foreground">
-                  {session.user.name || session.user.email}
-                </span>
-                <span className="mx-2 text-border">·</span>
-                <span className="text-muted-foreground">{currency}</span>
-              </p>
-            )}
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleExportCSV}
-              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-muted-foreground hover:text-foreground"
-              title="Export this month as CSV"
-            >
-              <Download className="w-4 h-4 md:mr-1.5" />
-              <span className="hidden md:inline text-sm">Export</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4 md:mr-1.5" />
-              <span className="hidden md:inline text-sm">Sign out</span>
-            </Button>
-          </div>
-        </header>
-
-        {/* Tabs */}
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <Tabs defaultValue="expense" className="w-full">
-            <TabsList className={`grid w-full grid-cols-${TABS.length} bg-muted p-0 rounded-none border-b border-border h-auto`}>
-              {TABS.map(tab => (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className="relative data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground rounded-none border-0 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-3"
-                >
-                  <span className="hidden sm:inline">{tab.icon} {tab.label}</span>
-                  <span className="sm:hidden">{tab.icon}</span>
-                  {tab.badge && (
-                    <span className="absolute -top-1 -right-1 text-[8px] bg-primary text-primary-foreground px-1 rounded-full font-bold hidden sm:inline">
-                      {tab.badge}
-                    </span>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            <div className="p-4 md:p-6">
-              <TabsContent value="expense" className="mt-0 animate-in fade-in">
-                <ExpenseManager key={refreshTrigger} onUpdate={handleRefresh} />
-              </TabsContent>
-
-              <TabsContent value="invoices" className="mt-0 animate-in fade-in">
-                <div className="text-center py-16 text-muted-foreground">
-                  <span className="text-5xl">🧾</span>
-                  <h3 className="text-xl font-bold text-foreground mt-4">Invoices — Coming in Sprint 2</h3>
-                  <p className="text-sm mt-2 max-w-sm mx-auto">
-                    Create professional invoices with your business logo, VAT calculation, and PDF export.
-                    Clients module is live — add your clients now!
-                  </p>
-                  <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
-                    {['Line items', 'UAE 5% VAT', 'AED / USD / PKR', 'PDF export', 'WhatsApp share'].map(f => (
-                      <span key={f} className="bg-muted px-3 py-1 rounded-full">{f}</span>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="clients" className="mt-0 animate-in fade-in">
-                <ClientsManager key={refreshTrigger} onUpdate={handleRefresh} />
-              </TabsContent>
-
-              <TabsContent value="debt" className="mt-0 animate-in fade-in">
-                <DebtManager key={refreshTrigger} onUpdate={handleRefresh} />
-              </TabsContent>
-
-              <TabsContent value="bill" className="mt-0 animate-in fade-in">
-                <BillSplit key={refreshTrigger} onUpdate={handleRefresh} />
-              </TabsContent>
-            </div>
-          </Tabs>
+          {session?.user && (
+            <p className="text-xs text-muted-foreground mt-3 truncate">
+              {session.user.name || session.user.email}
+            </p>
+          )}
         </div>
 
-        {/* Footer */}
-        <footer className="mt-6 text-center text-xs text-muted-foreground">
-          FinWise Pro · Your data is private and encrypted
-        </footer>
+        {/* Nav Items */}
+        <nav className="flex-1 p-3 space-y-1">
+          {NAV.map(item => {
+            const active = page === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                }`}
+              >
+                <span className="text-base">{item.emoji}</span>
+                {item.label}
+                {active && <ChevronRight className="w-4 h-4 ml-auto opacity-70" />}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Actions */}
+        <div className="p-3 border-t border-border space-y-1">
+          <button
+            onClick={handleExportCSV}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Mobile Drawer Overlay ─────────────────────────────── */}
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile Drawer ─────────────────────────────────────── */}
+      <div className={`fixed top-0 left-0 h-full w-64 bg-card border-r border-border z-50 transform transition-transform duration-300 md:hidden ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Drawer Header */}
+        <div className="p-5 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">💰</span>
+            <div>
+              <p className="text-lg font-bold text-foreground leading-none">FinWise</p>
+              <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Pro</p>
+            </div>
+          </div>
+          <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {session?.user && (
+          <div className="px-5 py-3 border-b border-border">
+            <p className="text-xs text-muted-foreground">Signed in as</p>
+            <p className="text-sm font-medium text-foreground truncate">{session.user.name || session.user.email}</p>
+            <p className="text-xs text-muted-foreground">{currency}</p>
+          </div>
+        )}
+
+        {/* Drawer Nav */}
+        <nav className="p-3 space-y-1">
+          {NAV.map(item => {
+            const active = page === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                }`}
+              >
+                <span className="text-lg">{item.emoji}</span>
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Drawer Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border space-y-1">
+          <button
+            onClick={handleExportCSV}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
       </div>
-    </main>
+
+      {/* ── Main Content ──────────────────────────────────────── */}
+      <main className="flex-1 md:ml-56 min-h-screen flex flex-col">
+        {/* Mobile Top Bar */}
+        <header className="md:hidden sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="p-2 rounded-xl hover:bg-muted transition-colors"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">💰</span>
+            <div>
+              <span className="font-bold text-foreground text-sm">FinWise</span>
+              <span className="text-[9px] font-bold tracking-widest text-primary uppercase ml-1">Pro</span>
+            </div>
+          </div>
+          <div className="w-9" /> {/* Spacer to center title */}
+        </header>
+
+        {/* Page Content */}
+        <div className="flex-1 p-4 md:p-8 max-w-4xl w-full mx-auto">
+          {/* Page Title */}
+          <div className="mb-6 hidden md:flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{current.emoji} {current.label}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {page === 'expenses'  && 'Track your income and expenses'}
+                {page === 'invoices'  && 'Create and manage professional invoices'}
+                {page === 'clients'   && 'Manage your client directory'}
+                {page === 'debts'     && 'Track money owed between people'}
+                {page === 'bills'     && 'Split bills equally among friends'}
+              </p>
+            </div>
+          </div>
+
+          {/* Page Views */}
+          <div className="bg-card rounded-2xl border border-border p-4 md:p-6">
+            {page === 'expenses' && <ExpenseManager key={refreshTrigger} onUpdate={handleRefresh} />}
+            {page === 'invoices' && <InvoiceManager key={refreshTrigger} onUpdate={handleRefresh} />}
+            {page === 'clients'  && <ClientsManager key={refreshTrigger} onUpdate={handleRefresh} />}
+            {page === 'debts'    && <DebtManager    key={refreshTrigger} onUpdate={handleRefresh} />}
+            {page === 'bills'    && <BillSplit       key={refreshTrigger} onUpdate={handleRefresh} />}
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
