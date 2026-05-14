@@ -1,24 +1,26 @@
 version: '3.8'
 
 services:
-  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  # ── MySQL Database ───────────────────────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: mysql:8
     container_name: finwise_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       finwise_db
-      POSTGRES_USER:     finwise_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD}   # Set in .env file
+      MYSQL_DATABASE:      finwise_db
+      MYSQL_USER:          finwise_user
+      MYSQL_PASSWORD:      ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     ports:
-      - "5432:5432"       # Remove this line in production if app is on same network
+      - "3306:3306"       # Internal only — do NOT expose publicly
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U finwise_user -d finwise_db"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "finwise_user", "--password=${DB_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s   # Give MySQL time to initialize on first run
 
   # ── FinWise Next.js App ──────────────────────────────────────────────────────
   app:
@@ -31,10 +33,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Database — uses internal Docker network hostname
-      DATABASE_URL: postgresql://finwise_user:${DB_PASSWORD}@db:5432/finwise_db
+      # MySQL connection string (uses internal Docker hostname 'db')
+      DATABASE_URL: mysql://finwise_user:${DB_PASSWORD}@db:3306/finwise_db
 
-      # NextAuth — MUST match your public domain
+      # NextAuth
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL:    ${NEXTAUTH_URL}
 
@@ -44,13 +46,14 @@ services:
 
       NODE_ENV: production
     ports:
-      - "3000:3000"
+      - "3000:3000"       # App accessible at http://YOUR_IP:3000
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/auth/providers || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
 volumes:
-  postgres_data:
+  mysql_data:
     driver: local

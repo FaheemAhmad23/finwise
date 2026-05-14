@@ -1,255 +1,205 @@
 # FinWise — Docker Deployment Guide
-### Self-Hosted on Server IP (No Domain Required)
+### Self-Hosted on Server IP · MySQL Database
 
 ---
 
-## Prerequisites
+## What You'll Have Running
 
-Your server needs:
-- **Ubuntu 20.04+** (or any Linux distro)
-- **Docker 24+** and **Docker Compose v2**
-- **2 GB RAM minimum** (4 GB recommended)
-- Your server's public IP address
-
----
-
-## Step 1 — Install Docker on Your Server
-
-```bash
-# SSH into your server
-ssh user@YOUR_SERVER_IP
-
-# Install Docker
-curl -fsSL https://get.docker.com | sh
-
-# Add your user to the docker group (no sudo needed)
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Verify
-docker --version
-docker compose version
+```
+Your Browser
+     │  http://168.144.35.138:3000
+     ▼
+┌──────────────────┐     ┌──────────────────┐
+│  finwise_app     │────▶│  finwise_db      │
+│  Next.js         │     │  MySQL 8         │
+│  Port: 3000      │     │  Port: 3306      │
+└──────────────────┘     │  (internal only) │
+                         └──────────────────┘
+     Both run inside Docker on your server.
+     MySQL data is saved to a Docker volume (survives restarts).
 ```
 
 ---
 
-## Step 2 — Get the Code onto Your Server
+## Step 1 — SSH into Your Server
 
-**Option A — Clone from GitHub (recommended)**
+```bash
+ssh root@168.144.35.138
+```
+*(or `ssh user@168.144.35.138` if you have a non-root user)*
+
+---
+
+## Step 2 — Install Docker
+
+```bash
+# Download and run the official Docker install script
+curl -fsSL https://get.docker.com | sh
+
+# Verify it works
+docker --version
+docker compose version
+```
+
+Expected output: `Docker version 24.x.x` and `Docker Compose version v2.x.x`
+
+---
+
+## Step 3 — Get the Code
+
 ```bash
 git clone https://github.com/TheMalikFaheem/finwise.git
 cd finwise
 ```
 
-**Option B — SCP from your Mac**
-```bash
-# Run this on your Mac
-scp -r /Users/malikfaheem/Documents/debt-manager-app user@YOUR_SERVER_IP:/home/user/finwise
-```
-
 ---
 
-## Step 3 — Create the `.env` File
+## Step 4 — Create the `.env` File
 
-On your server inside the project folder:
+This file holds all your secrets. **Never share or commit this file.**
 
 ```bash
-cd finwise
 nano .env
 ```
 
-Paste and fill in your values:
+Copy-paste exactly this, then change the passwords and secret:
 
 ```bash
-# ── Database ──────────────────────────────────────────
-DB_PASSWORD=choose_a_strong_password_here
+# MySQL passwords — choose anything strong
+DB_PASSWORD=Finwise@2026!
+DB_ROOT_PASSWORD=RootFinwise@2026!
 
-# ── NextAuth ──────────────────────────────────────────
-# Generate a secret:  openssl rand -base64 32
-NEXTAUTH_SECRET=paste_your_generated_secret_here
+# NextAuth secret — generate a random one with the command below
+NEXTAUTH_SECRET=REPLACE_THIS_WITH_GENERATED_SECRET
 
-# ⚠️  No domain yet — use your server's IP and port
-NEXTAUTH_URL=http://YOUR_SERVER_IP:3000
+# Your server IP (already filled in for you)
+NEXTAUTH_URL=http://168.144.35.138:3000
 
-# ── Google OAuth (leave blank for now) ───────────────
+# Google login — leave blank for now
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 ```
 
-> **Generate NEXTAUTH_SECRET on your server:**
-> ```bash
-> openssl rand -base64 32
-> ```
+**To generate NEXTAUTH_SECRET, run this in another terminal:**
+```bash
+openssl rand -base64 32
+```
+Copy the output and paste it as the value for `NEXTAUTH_SECRET`.
 
-> **Find your server IP:**
-> ```bash
-> curl -4 ifconfig.me
-> ```
+**Save the file:** press `Ctrl+X`, then `Y`, then `Enter`
 
 ---
 
-## Step 4 — Open Port 3000 on the Firewall
+## Step 5 — Open the Firewall Port
 
 ```bash
-sudo ufw allow 22      # SSH (keep this!)
-sudo ufw allow 3000    # FinWise app
+# Allow SSH (always keep this open!)
+sudo ufw allow 22
+
+# Allow the app port
+sudo ufw allow 3000
+
+# Enable firewall
 sudo ufw enable
+
+# Confirm
 sudo ufw status
 ```
 
+You should see `3000` listed as `ALLOW`.
+
 ---
 
-## Step 5 — Build and Launch
+## Step 6 — Build and Launch
 
 ```bash
-# Inside the finwise directory
+# Build the Docker image and start MySQL + the app
+# First launch takes 3-5 minutes (downloads images, builds app)
 docker compose up -d --build
 
-# Watch logs to confirm it started
+# Watch the logs to see when it's ready
 docker compose logs -f app
 ```
 
-You should see:
+**What you'll see in the logs:**
 ```
+finwise_db   | MySQL init process done. Ready for start up.
 finwise_app  | ✓ Prisma migrations applied
 finwise_app  | ▲ Next.js 16.x.x
-finwise_app  | - Local: http://localhost:3000
-finwise_app  | ✓ Ready in Xs
+finwise_app  | ✓ Ready in 3s
 ```
 
-**Your app is now live at:**
-```
-http://YOUR_SERVER_IP:3000
-```
-
-Open that in your browser and you'll see the FinWise login page. ✅
+Once you see `Ready`, your app is live!
 
 ---
 
-## Useful Docker Commands
+## Step 7 — Open in Your Browser
+
+Go to: **http://168.144.35.138:3000**
+
+You'll see the FinWise login page. Click **"Create one free"** to register your account.
+
+---
+
+## Daily Management Commands
 
 ```bash
-# View running containers
+# Check if containers are running
 docker compose ps
 
-# View app logs (live)
+# View live app logs
 docker compose logs -f app
 
-# View database logs
-docker compose logs -f db
-
-# Restart the app (after code updates)
-docker compose up -d --build app
-
-# Stop everything
+# Stop the app
 docker compose down
 
-# Open a shell inside the app
-docker compose exec app sh
+# Start it again
+docker compose up -d
+
+# Update to latest code
+git pull && docker compose up -d --build app
 ```
 
 ---
 
-## Updating the App
-
-When new code is pushed to GitHub:
+## Backup Your Data
 
 ```bash
-cd finwise
-git pull
-docker compose up -d --build app
-docker compose logs -f app
-```
+# Create a backup of the MySQL database
+docker compose exec db mysqldump -u finwise_user -p"${DB_PASSWORD}" finwise_db > backup-$(date +%Y-%m-%d).sql
 
-Database migrations run automatically on every restart.
-
----
-
-## Backup the Database
-
-```bash
-# Manual backup
-docker compose exec -T db pg_dump -U finwise_user finwise_db > backup-$(date +%Y-%m-%d).sql
-
-# Restore from backup
-cat backup-2026-05-14.sql | docker compose exec -T db psql -U finwise_user finwise_db
-```
-
----
-
-## When You Get a Domain Later
-
-1. Point the domain's A record to your server IP
-2. Update `.env`:
-   ```bash
-   NEXTAUTH_URL=https://yourdomain.com
-   ```
-3. Install Nginx + Certbot for SSL:
-   ```bash
-   sudo apt install -y nginx certbot python3-certbot-nginx
-   sudo certbot --nginx -d yourdomain.com
-   ```
-4. Add Nginx config (see below) and close port 3000:
-   ```bash
-   sudo ufw delete allow 3000
-   sudo ufw allow 'Nginx Full'
-   ```
-
-**Nginx config for future use:**
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    include             /etc/letsencrypt/options-ssl-nginx.conf;
-
-    location / {
-        proxy_pass         http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    $http_upgrade;
-        proxy_set_header   Connection 'upgrade';
-        proxy_set_header   Host       $host;
-        proxy_set_header   X-Real-IP  $remote_addr;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+# To restore from backup
+cat backup-2026-05-14.sql | docker compose exec -T db mysql -u finwise_user -p"${DB_PASSWORD}" finwise_db
 ```
 
 ---
 
 ## Troubleshooting
 
-| Problem | Fix |
+| Problem | What to check |
 |---|---|
-| Can't open `http://IP:3000` | Check firewall: `sudo ufw status` → port 3000 must show ALLOW |
-| App not starting | `docker compose logs app` to see the error |
-| Database connection refused | Check `DB_PASSWORD` is the same in `.env` for both services |
-| `NEXTAUTH_URL` mismatch | Must be `http://YOUR_SERVER_IP:3000` exactly — no trailing slash |
-| Prisma migration fails | `docker compose exec app npx prisma migrate status` |
-| Out of disk space | `docker system prune -af` to clear unused images |
+| Browser shows "can't connect" | Run `sudo ufw status` — port 3000 must show ALLOW |
+| App logs show DB connection error | MySQL takes 30-60s on first launch — wait and retry |
+| `NEXTAUTH_URL` mismatch error | Must be exactly `http://168.144.35.138:3000` — no trailing slash |
+| App crashes on start | Run `docker compose logs app` — read the error message |
+| Forgot DB password | It's in your `.env` file: `cat .env` |
 
 ---
 
-## Architecture (IP-only setup)
+## When You Get a Domain Later
 
-```
-Browser
-    │  http://YOUR_SERVER_IP:3000
-    ▼
-┌─────────────────────┐     ┌─────────────────────┐
-│  finwise_app        │────▶│  finwise_db          │
-│  (Next.js Docker)   │     │  (PostgreSQL Docker) │
-│  Port: 3000 (open)  │     │  Port: 5432 (internal│
-└─────────────────────┘     │  only, not exposed)  │
-                            └─────────────────────┘
-         Docker Volume: postgres_data (persistent)
-```
+1. Point the domain's DNS A record → `168.144.35.138`
+2. Update `.env`:
+   ```
+   NEXTAUTH_URL=https://yourdomain.com
+   ```
+3. Install Nginx + free SSL:
+   ```bash
+   sudo apt install -y nginx certbot python3-certbot-nginx
+   sudo certbot --nginx -d yourdomain.com
+   ```
+4. Close direct port 3000 access:
+   ```bash
+   sudo ufw delete allow 3000
+   sudo ufw allow 'Nginx Full'
+   ```
