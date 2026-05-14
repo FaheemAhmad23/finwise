@@ -1,0 +1,36 @@
+# ── Docker ignore — keep the build context small ──────────────────────────────
+
+# Dependencies (rebuilt inside Docker)
+node_modules
+npm-debug.log*
+
+# Build output
+.next
+out
+dist
+
+# Environment files (secrets must never go into the image)
+.env
+.env.local
+.env.*.local
+
+# Dev tools
+.git
+.gitignore
+.eslintrc*
+.prettierrc*
+
+# Docs
+*.md
+!README.md
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Test files
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+coverage

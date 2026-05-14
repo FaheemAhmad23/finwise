@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: finwise_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       finwise_db
+      POSTGRES_USER:     finwise_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}   # Set in .env file
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"       # Remove this line in production if app is on same network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finwise_user -d finwise_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FinWise Next.js App ──────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finwise_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database — uses internal Docker network hostname
+      DATABASE_URL: postgresql://finwise_user:${DB_PASSWORD}@db:5432/finwise_db
+
+      # NextAuth — MUST match your public domain
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL:    ${NEXTAUTH_URL}
+
+      # Optional: Google OAuth
+      GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/auth/providers || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
