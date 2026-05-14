@@ -42,14 +42,12 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
     if (results.length === 0) return;
     setSaving(true);
     try {
-      // Fetch existing people
       const peopleRes = await fetch('/api/people');
       const people: any[] = await peopleRes.json();
 
       for (const result of results) {
         const existing = people.find((p: any) => p.name.toLowerCase() === result.name.toLowerCase());
         if (existing) {
-          // Add transaction to existing person
           await fetch(`/api/people/${existing.id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -60,7 +58,6 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
             }),
           });
         } else {
-          // Create new person + transaction
           const newPersonRes = await fetch('/api/people', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -95,8 +92,8 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
   return (
     <div className="space-y-6">
       {/* Bill Info */}
-      <div className="rounded-2xl border border-slate-200/60 bg-white p-6 space-y-4">
-        <h3 className="font-semibold text-slate-900">Bill Split Calculator</h3>
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+        <h3 className="font-semibold text-foreground">Bill Split Calculator</h3>
         <p className="text-sm text-muted-foreground">Split a bill equally and add shares to People Debts automatically.</p>
 
         <div className="space-y-2">
@@ -111,8 +108,8 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
       </div>
 
       {/* Participants */}
-      <div className="rounded-2xl border border-slate-200/60 bg-white p-6 space-y-4">
-        <h3 className="font-semibold text-slate-900">Participants</h3>
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+        <h3 className="font-semibold text-foreground">Participants</h3>
         <div className="flex gap-2">
           <Input
             placeholder="Add participant name…"
@@ -131,10 +128,10 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
         ) : (
           <div className="space-y-2">
             {participants.map(p => (
-              <div key={p.id} className="flex items-center justify-between p-3 border rounded-xl bg-slate-50">
-                <span className="font-medium text-sm">{p.name}</span>
+              <div key={p.id} className="flex items-center justify-between p-3 border border-border rounded-xl bg-muted/40">
+                <span className="font-medium text-sm text-foreground">{p.name}</span>
                 <Button variant="ghost" size="sm" onClick={() => setParticipants(prev => prev.filter(x => x.id !== p.id))}>
-                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <Trash2 className="w-4 h-4 text-red-400" />
                 </Button>
               </div>
             ))}
@@ -151,29 +148,29 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-6 space-y-4">
+        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-6 space-y-4">
           <div>
-            <h3 className="font-semibold text-green-900">Split Results</h3>
-            <p className="text-sm text-green-700 mt-1">
+            <h3 className="font-semibold text-green-400">Split Results</h3>
+            <p className="text-sm text-green-400/70 mt-1">
               Each person pays: <strong>{(parseFloat(billAmount) / results.length).toFixed(2)} {currency}</strong>
             </p>
           </div>
 
           <div className="space-y-2">
             {results.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border border-green-100">
-                <span className="font-medium">{r.name}</span>
-                <span className="text-lg font-bold text-green-600">{r.share.toFixed(2)} {currency}</span>
+              <div key={i} className="flex items-center justify-between p-3 bg-card rounded-xl border border-green-500/20">
+                <span className="font-medium text-foreground">{r.name}</span>
+                <span className="text-lg font-bold text-green-400">{r.share.toFixed(2)} {currency}</span>
               </div>
             ))}
           </div>
 
-          <div className="flex justify-between font-bold text-lg border-t border-green-200 pt-3">
+          <div className="flex justify-between font-bold text-lg border-t border-green-500/20 pt-3 text-foreground">
             <span>Total:</span>
-            <span className="text-green-700">{parseFloat(billAmount).toFixed(2)} {currency}</span>
+            <span className="text-green-400">{parseFloat(billAmount).toFixed(2)} {currency}</span>
           </div>
 
-          <Button onClick={addToDebts} disabled={saving} className="w-full rounded-xl bg-green-600 hover:bg-green-700">
+          <Button onClick={addToDebts} disabled={saving} className="w-full rounded-xl bg-green-600 hover:bg-green-700 text-white">
             {saving ? 'Adding to Debts…' : '➕ Add All to People Debts'}
           </Button>
 
