@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Manrope } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { Toaster } from 'sonner';
 import { SessionProviderWrapper } from '@/components/session-provider';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
+  weight: ['400', '500', '600', '700', '800'],
+});
 
 export const metadata: Metadata = {
   title: 'FinWise — Smart Money Manager',
@@ -32,11 +36,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} bg-background`}>
-      <body className="font-sans antialiased">
+    // Force dark class — app is always dark themed
+    <html lang="en" className={`${manrope.variable} dark`}>
+      <body className="font-sans antialiased bg-background text-foreground">
         <SessionProviderWrapper>
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster richColors position="top-right" theme="dark" />
           {process.env.NODE_ENV === 'production' && <Analytics />}
         </SessionProviderWrapper>
       </body>
