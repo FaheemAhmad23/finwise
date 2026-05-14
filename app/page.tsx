@@ -23,7 +23,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-background">
       <div className="container mx-auto py-4 px-4 md:px-8 max-w-4xl">
 
         {/* Header */}
@@ -31,13 +31,16 @@ export default function Home() {
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <span className="text-3xl">💰</span>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">FinWise</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">FinWise</h1>
             </div>
             {session?.user && (
-              <p className="text-sm text-slate-500">
-                Welcome back, <span className="font-medium text-slate-700">{session.user.name || session.user.email}</span>
-                <span className="mx-2 text-slate-300">·</span>
-                <span className="text-slate-400">{currency}</span>
+              <p className="text-sm text-muted-foreground">
+                Welcome back,{' '}
+                <span className="font-medium text-foreground">
+                  {session.user.name || session.user.email}
+                </span>
+                <span className="mx-2 text-border">·</span>
+                <span className="text-muted-foreground">{currency}</span>
               </p>
             )}
           </div>
@@ -47,7 +50,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={handleExportCSV}
-              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-slate-600"
+              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-muted-foreground hover:text-foreground"
               title="Export this month as CSV"
             >
               <Download className="w-4 h-4 md:mr-1.5" />
@@ -58,7 +61,7 @@ export default function Home() {
               variant="ghost"
               size="sm"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-slate-600 hover:text-red-600 hover:bg-red-50"
+              className="h-9 w-9 p-0 md:h-auto md:w-auto md:px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               title="Sign out"
             >
               <LogOut className="w-4 h-4 md:mr-1.5" />
@@ -68,9 +71,9 @@ export default function Home() {
         </header>
 
         {/* Tabs */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <Tabs defaultValue="expense" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-100 p-0 rounded-none border-b border-slate-200 h-auto">
+            <TabsList className="grid w-full grid-cols-3 bg-muted p-0 rounded-none border-b border-border h-auto">
               {[
                 { value: 'expense', icon: '📊', label: 'Expenses' },
                 { value: 'debt',    icon: '💳', label: 'Debts' },
@@ -79,7 +82,7 @@ export default function Home() {
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 data-[state=active]:text-slate-900 rounded-none border-0 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium py-3"
+                  className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground rounded-none border-0 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-3"
                 >
                   <span className="hidden sm:inline">{tab.icon} {tab.label}</span>
                   <span className="sm:hidden">{tab.icon}</span>
@@ -102,7 +105,7 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <footer className="mt-6 text-center text-xs text-slate-400">
+        <footer className="mt-6 text-center text-xs text-muted-foreground">
           FinWise · Your data is private and encrypted
         </footer>
       </div>
