@@ -4,7 +4,6 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json ./
-# Delete any existing lock file — let npm resolve fresh from package.json
 RUN npm install --legacy-peer-deps
 
 # ── Stage 2: Generate Prisma client + Build ────────────────────────────────────
@@ -15,7 +14,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Use the locally installed prisma (v5) — NOT npx which downloads the latest (v7)
 RUN ./node_modules/.bin/prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -32,16 +30,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
 
-# Copy standalone build
+# Copy standalone build output
 COPY --from=builder /app/public                                    ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone    ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static        ./.next/static
 
-# Copy Prisma runtime files
+# Copy Prisma runtime + CLI (v5 binary is at build/index.js)
 COPY --from=builder /app/prisma                                    ./prisma
 COPY --from=builder /app/node_modules/.prisma                      ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma                      ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma                       ./node_modules/prisma
+
+# Copy entrypoint script
+COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 USER nextjs
 
@@ -49,5 +51,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Use local prisma binary for migrations too
-CMD ["sh", "-c", "./node_modules/prisma/bin/prisma.js migrate deploy && node server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
