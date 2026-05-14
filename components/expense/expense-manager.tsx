@@ -208,13 +208,13 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
   if (loading) {
     return (
       <div className="space-y-4 pb-4 animate-pulse">
-        <div className="h-14 bg-slate-100 rounded-2xl" />
-        <div className="h-24 bg-slate-100 rounded-2xl" />
+        <div className="h-14 bg-muted rounded-2xl" />
+        <div className="h-24 bg-muted rounded-2xl" />
         <div className="grid grid-cols-2 gap-3">
-          <div className="h-20 bg-slate-100 rounded-2xl" />
-          <div className="h-20 bg-slate-100 rounded-2xl" />
+          <div className="h-20 bg-muted rounded-2xl" />
+          <div className="h-20 bg-muted rounded-2xl" />
         </div>
-        <div className="h-64 bg-slate-100 rounded-2xl" />
+        <div className="h-64 bg-muted rounded-2xl" />
       </div>
     );
   }
@@ -263,33 +263,33 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
       {/* Summary Cards */}
       <div className="space-y-2 md:space-y-3 px-4 md:px-0">
         <div className="grid grid-cols-2 gap-2 md:gap-3">
-          <div className="rounded-2xl bg-green-50 p-4 md:p-6 border border-green-200/60">
+          <div className="rounded-2xl bg-green-500/10 p-4 md:p-6 border border-green-500/20">
             <p className="text-xs md:text-sm text-muted-foreground font-medium">Income</p>
-            <p className="text-xl md:text-2xl font-semibold text-green-600 mt-1">
+            <p className="text-xl md:text-2xl font-semibold text-green-400 mt-1">
               {totalIncome.toLocaleString()} <span className="text-sm">{currency}</span>
             </p>
           </div>
-          <div className="rounded-2xl bg-red-50 p-4 md:p-6 border border-red-200/60">
+          <div className="rounded-2xl bg-red-500/10 p-4 md:p-6 border border-red-500/20">
             <p className="text-xs md:text-sm text-muted-foreground font-medium">Expenses</p>
-            <p className="text-xl md:text-2xl font-semibold text-red-600 mt-1">
+            <p className="text-xl md:text-2xl font-semibold text-red-400 mt-1">
               {totalExpenses.toLocaleString()} <span className="text-sm">{currency}</span>
             </p>
           </div>
         </div>
 
-        <div className={`rounded-2xl p-4 md:p-6 border ${closingBalance >= 0 ? 'bg-blue-50 border-blue-200/60' : 'bg-amber-50 border-amber-200/60'}`}>
+        <div className={`rounded-2xl p-4 md:p-6 border ${closingBalance >= 0 ? 'bg-primary/10 border-primary/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
           <p className="text-xs md:text-sm text-muted-foreground font-medium">Net Balance</p>
-          <p className={`text-2xl md:text-3xl font-semibold mt-1 ${closingBalance >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+          <p className={`text-2xl md:text-3xl font-semibold mt-1 ${closingBalance >= 0 ? 'text-primary' : 'text-amber-400'}`}>
             {closingBalance >= 0 ? '+' : ''}{closingBalance.toLocaleString()} <span className="text-lg">{currency}</span>
           </p>
         </div>
       </div>
 
       {/* Transactions */}
-      <div className="rounded-3xl border border-slate-200/60 bg-white overflow-hidden mx-4 md:mx-0">
-        <div className="p-4 md:p-6 border-b border-slate-200/60 flex items-center justify-between">
+      <div className="rounded-3xl border border-border bg-card overflow-hidden mx-4 md:mx-0">
+        <div className="p-4 md:p-6 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-slate-900 text-sm md:text-base">Transactions</h3>
+            <h3 className="font-semibold text-foreground text-sm md:text-base">Transactions</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} this month</p>
           </div>
 
@@ -308,7 +308,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type</label>
                   <select
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-border bg-card text-foreground px-4 py-2.5 text-sm"
                     value={formData.type}
                     onChange={(e: any) => setFormData({ ...formData, type: e.target.value, category: '' })}
                   >
@@ -319,7 +319,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
                   <select
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-border bg-card text-foreground px-4 py-2.5 text-sm"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   >
@@ -355,18 +355,18 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
             <p className="text-xs text-muted-foreground mt-1">Tap + to add your first transaction</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {[...expenses]
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((trans) => (
-                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-slate-900 text-sm truncate">{trans.category}</p>
+                      <p className="font-medium text-foreground text-sm truncate">{trans.category}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap font-medium ${
-                        trans.isDebtTransaction ? 'bg-purple-100 text-purple-700'
-                          : trans.type === 'income' ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                        trans.isDebtTransaction ? 'bg-purple-500/20 text-purple-400'
+                          : trans.type === 'income' ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
                       }`}>
                         {trans.isDebtTransaction ? (trans.type === 'expense' ? 'Lent' : 'Repaid') : trans.type === 'income' ? 'In' : 'Out'}
                       </span>
@@ -378,17 +378,17 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
                     {trans.description && <p className="text-xs text-muted-foreground mt-1 truncate">{trans.description}</p>}
                   </div>
                   <div className="flex items-center gap-2 md:gap-3 ml-3">
-                    <p className={`font-semibold text-sm md:text-base min-w-fit ${trans.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`font-semibold text-sm md:text-base min-w-fit ${trans.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
                       {trans.type === 'income' ? '+' : '-'}{trans.amount.toLocaleString()}
                     </p>
                     <div className="flex gap-1">
                       {!trans.isDebtTransaction && (
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(trans)} className="h-8 w-8 p-0 hover:bg-slate-100">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(trans)} className="h-8 w-8 p-0 hover:bg-muted">
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(trans.id)} className="h-8 w-8 p-0 hover:bg-red-50">
-                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(trans.id)} className="h-8 w-8 p-0 hover:bg-red-500/10">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
                       </Button>
                     </div>
                   </div>
@@ -402,12 +402,12 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
       {expenses.length > 0 && (
         <div className="space-y-3 md:space-y-6 px-4 md:px-0">
           <Tabs defaultValue="category" className="w-full">
-            <TabsList className="w-full rounded-full bg-slate-100 p-1 grid grid-cols-2">
+            <TabsList className="w-full rounded-full bg-muted p-1 grid grid-cols-2">
               <TabsTrigger value="category" className="rounded-full text-xs md:text-sm">Categories</TabsTrigger>
               <TabsTrigger value="daily"    className="rounded-full text-xs md:text-sm">Daily Trend</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="category" className="mt-4 rounded-2xl border border-slate-200/60 bg-white p-4 md:p-6">
+            <TabsContent value="category" className="mt-4 rounded-2xl border border-border bg-card p-4 md:p-6">
               {categoryBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
@@ -417,7 +417,10 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
                     >
                       {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`} />
+                    <Tooltip
+                      formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -425,16 +428,19 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
               )}
             </TabsContent>
 
-            <TabsContent value="daily" className="mt-4 rounded-2xl border border-slate-200/60 bg-white p-4 md:p-6">
+            <TabsContent value="daily" className="mt-4 rounded-2xl border border-border bg-card p-4 md:p-6">
               {dailyData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={dailyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                    <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
-                    <Tooltip formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`} />
-                    <Line type="monotone" dataKey="income"  stroke="#22c55e" strokeWidth={2} dot={false} name="Income" />
-                    <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name="Expense" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="date" stroke="#475569" style={{ fontSize: '11px' }} />
+                    <YAxis stroke="#475569" style={{ fontSize: '11px' }} />
+                    <Tooltip
+                      formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
+                    />
+                    <Line type="monotone" dataKey="income"  stroke="#4ade80" strokeWidth={2} dot={false} name="Income" />
+                    <Line type="monotone" dataKey="expense" stroke="#f87171" strokeWidth={2} dot={false} name="Expense" />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
