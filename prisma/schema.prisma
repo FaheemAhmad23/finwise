@@ -20,10 +20,11 @@ model User {
   image     String?
   currency  String   @default("PKR")
   timezone  String   @default("Asia/Karachi")
+  plan      String   @default("free") // free | pro | business
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
+  // Existing relations
   transactions          Transaction[]
   people                Person[]
   budgets               Budget[]
@@ -31,6 +32,119 @@ model User {
   groups                Group[]
   accounts              Account[]
   sessions              Session[]
+
+  // New FinWise Pro relations
+  businessProfile BusinessProfile?
+  clients         Client[]
+  products        Product[]
+  invoices        Invoice[]
+}
+
+// ─── Business Profile ─────────────────────────────────────────────────────────
+
+model BusinessProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String?
+  logoUrl     String?
+  address     String?
+  city        String?
+  country     String   @default("UAE")
+  phone       String?
+  whatsapp    String?
+  website     String?
+  trn         String?  // UAE Tax Registration Number
+  currency    String   @default("AED")
+  invoiceNote String?  @db.Text
+  invoicePrefix String @default("INV")
+  nextInvoiceNo Int    @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  whatsapp  String?
+  company   String?
+  address   String?
+  city      String?
+  country   String?
+  notes     String?   @db.Text
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ─── Service / Product Catalog ────────────────────────────────────────────────
+
+model Product {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Float
+  unit        String        @default("item") // item | hour | day | page | month
+  isActive    Boolean       @default(true)
+  invoiceItems InvoiceItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?       @relation(fields: [clientId], references: [id])
+  invoiceNo   String        // e.g. INV-2026-0042
+  status      String        @default("draft") // draft | sent | paid | overdue | cancelled
+  currency    String        @default("AED")
+  issueDate   DateTime      @default(now())
+  dueDate     DateTime?
+  subtotal    Float         @default(0)
+  taxRate     Float         @default(5)   // UAE 5% VAT
+  taxAmount   Float         @default(0)
+  discount    Float         @default(0)
+  total       Float         @default(0)
+  notes       String?       @db.Text
+  items       InvoiceItem[]
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([userId, invoiceNo])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+// ─── Invoice Line Items ────────────────────────────────────────────────────────
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  total       Float
+
+  @@index([invoiceId])
 }
 
 // ─── NextAuth Adapter Models ──────────────────────────────────────────────────
