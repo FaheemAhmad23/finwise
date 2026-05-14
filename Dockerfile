@@ -3,8 +3,8 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-# Always use npm — avoids pnpm/Node version conflicts
+COPY package.json ./
+# Delete any existing lock file — let npm resolve fresh from package.json
 RUN npm install --legacy-peer-deps
 
 # ── Stage 2: Generate Prisma client + Build ────────────────────────────────────
@@ -15,8 +15,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client for Linux (required for Docker)
-RUN npx prisma generate
+# Use the locally installed prisma (v5) — NOT npx which downloads the latest (v7)
+RUN ./node_modules/.bin/prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
@@ -29,19 +29,19 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
 
-# Copy standalone Next.js build
+# Copy standalone build
 COPY --from=builder /app/public                                    ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone    ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static        ./.next/static
 
-# Copy Prisma files needed at runtime
+# Copy Prisma runtime files
 COPY --from=builder /app/prisma                                    ./prisma
 COPY --from=builder /app/node_modules/.prisma                      ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma                      ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma                       ./node_modules/prisma
 
 USER nextjs
 
@@ -49,5 +49,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run DB migrations then start app
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+# Use local prisma binary for migrations too
+CMD ["sh", "-c", "./node_modules/prisma/bin/prisma.js migrate deploy && node server.js"]

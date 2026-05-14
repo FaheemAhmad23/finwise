@@ -10,7 +10,8 @@ export async function generateMonthlyPDF(
   balance: number,
   openingBalance: number
 ) {
-  const { jsPDF } = await import('jspdf');
+  const jsPDFModule = await import('jspdf');
+  const { jsPDF } = jsPDFModule.default ?? jsPDFModule;
   await import('jspdf-autotable');
 
   const doc = new jsPDF();
