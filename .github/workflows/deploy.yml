@@ -3,10 +3,9 @@ name: 🚀 Build & Deploy FinWise
 on:
   push:
     branches: [main]
-  workflow_dispatch:    # Allow manual trigger from GitHub UI
+  workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/finwise
 
 jobs:
@@ -17,9 +16,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-
-    outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -35,58 +31,53 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=sha-
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # GitHub Actions cache — makes subsequent builds 3-5x faster
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Job 2: Deploy to production server via SSH ───────────────────────────────
+  # ── Job 2: SSH into server and deploy ────────────────────────────────────────
   deploy:
     name: 🌐 Deploy to Server
     runs-on: ubuntu-latest
-    needs: build          # Only runs if build job succeeds
-    environment: production
+    needs: build
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host:     ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
-          port:     ${{ secrets.SSH_PORT }}
-          script: |
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          # Write the private key — stored as base64 to avoid newline issues
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Trust the server host
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to server
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ secrets.SSH_PORT }} \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
             set -e
             cd /root/finwise
 
-            echo "📦 Logging into GitHub Container Registry..."
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-
             echo "⬇️  Pulling latest image..."
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             docker compose pull app
 
-            echo "♻️  Restarting app container..."
+            echo "♻️  Restarting app..."
             docker compose up -d --no-build app
 
-            echo "🧹 Removing old/unused Docker images..."
             docker image prune -f
 
-            echo "📋 Last 20 log lines:"
-            docker compose logs --tail=20 app
+            echo "📋 App logs:"
+            docker compose logs --tail=10 app
 
-            echo "✅ Deployment complete!"
+            echo "✅ Done!"
+          ENDSSH
