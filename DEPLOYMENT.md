@@ -1,5 +1,5 @@
 # FinWise — Docker Deployment Guide
-### Self-Hosted on Your Own Server
+### Self-Hosted on Server IP (No Domain Required)
 
 ---
 
@@ -9,7 +9,7 @@ Your server needs:
 - **Ubuntu 20.04+** (or any Linux distro)
 - **Docker 24+** and **Docker Compose v2**
 - **2 GB RAM minimum** (4 GB recommended)
-- A domain name pointed at your server IP (for HTTPS)
+- Your server's public IP address
 
 ---
 
@@ -17,7 +17,7 @@ Your server needs:
 
 ```bash
 # SSH into your server
-ssh user@your-server-ip
+ssh user@YOUR_SERVER_IP
 
 # Install Docker
 curl -fsSL https://get.docker.com | sh
@@ -33,62 +33,79 @@ docker compose version
 
 ---
 
-## Step 2 — Upload Your Code to the Server
+## Step 2 — Get the Code onto Your Server
 
-**Option A — Git (recommended)**
+**Option A — Clone from GitHub (recommended)**
 ```bash
-# On your server
-git clone https://github.com/yourusername/finwise.git
+git clone https://github.com/TheMalikFaheem/finwise.git
 cd finwise
 ```
 
 **Option B — SCP from your Mac**
 ```bash
-# On your Mac, from the project directory
-scp -r /Users/malikfaheem/Documents/debt-manager-app user@your-server-ip:/home/user/finwise
+# Run this on your Mac
+scp -r /Users/malikfaheem/Documents/debt-manager-app user@YOUR_SERVER_IP:/home/user/finwise
 ```
 
 ---
 
 ## Step 3 — Create the `.env` File
 
-On your server, inside the project directory:
+On your server inside the project folder:
 
 ```bash
-cd /home/user/finwise
+cd finwise
 nano .env
 ```
 
-Paste and fill in all values:
+Paste and fill in your values:
 
 ```bash
 # ── Database ──────────────────────────────────────────
-DB_PASSWORD=choose_a_very_strong_password_here
+DB_PASSWORD=choose_a_strong_password_here
 
 # ── NextAuth ──────────────────────────────────────────
-# Generate: openssl rand -base64 32
+# Generate a secret:  openssl rand -base64 32
 NEXTAUTH_SECRET=paste_your_generated_secret_here
-NEXTAUTH_URL=https://yourdomain.com
 
-# ── Google OAuth (optional) ───────────────────────────
+# ⚠️  No domain yet — use your server's IP and port
+NEXTAUTH_URL=http://YOUR_SERVER_IP:3000
+
+# ── Google OAuth (leave blank for now) ───────────────
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 ```
 
-> **Generate NEXTAUTH_SECRET:**
+> **Generate NEXTAUTH_SECRET on your server:**
 > ```bash
 > openssl rand -base64 32
 > ```
 
+> **Find your server IP:**
+> ```bash
+> curl -4 ifconfig.me
+> ```
+
 ---
 
-## Step 4 — Build and Launch
+## Step 4 — Open Port 3000 on the Firewall
 
 ```bash
-# Build the Docker image and start both services
+sudo ufw allow 22      # SSH (keep this!)
+sudo ufw allow 3000    # FinWise app
+sudo ufw enable
+sudo ufw status
+```
+
+---
+
+## Step 5 — Build and Launch
+
+```bash
+# Inside the finwise directory
 docker compose up -d --build
 
-# Watch logs to confirm it started correctly
+# Watch logs to confirm it started
 docker compose logs -f app
 ```
 
@@ -100,104 +117,12 @@ finwise_app  | - Local: http://localhost:3000
 finwise_app  | ✓ Ready in Xs
 ```
 
-**Test it works:**
-```bash
-curl http://localhost:3000
+**Your app is now live at:**
+```
+http://YOUR_SERVER_IP:3000
 ```
 
----
-
-## Step 5 — Set Up Nginx as Reverse Proxy (with HTTPS)
-
-### Install Nginx + Certbot
-
-```bash
-sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx
-```
-
-### Create Nginx Config
-
-```bash
-sudo nano /etc/nginx/sites-available/finwise
-```
-
-Paste this (replace `yourdomain.com`):
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-
-    # Redirect all HTTP to HTTPS
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
-
-    # SSL — managed by Certbot (filled in automatically)
-    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    include             /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
-
-    # Security headers
-    add_header X-Frame-Options       "SAMEORIGIN"   always;
-    add_header X-Content-Type-Options "nosniff"     always;
-    add_header X-XSS-Protection      "1; mode=block" always;
-    add_header Strict-Transport-Security "max-age=31536000" always;
-
-    # Proxy to Docker container
-    location / {
-        proxy_pass         http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    $http_upgrade;
-        proxy_set_header   Connection 'upgrade';
-        proxy_set_header   Host       $host;
-        proxy_set_header   X-Real-IP  $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 60s;
-    }
-}
-```
-
-### Enable the Config + Get SSL Certificate
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/finwise /etc/nginx/sites-enabled/
-
-# Test config
-sudo nginx -t
-
-# Reload Nginx
-sudo systemctl reload nginx
-
-# Get free SSL certificate from Let's Encrypt
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-
-# Verify auto-renewal works
-sudo certbot renew --dry-run
-```
-
-Your app is now live at `https://yourdomain.com` 🎉
-
----
-
-## Step 6 — Firewall Setup
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-sudo ufw status
-```
-
-> Do **NOT** expose port 3000 or 5432 publicly. Nginx handles all external traffic.
+Open that in your browser and you'll see the FinWise login page. ✅
 
 ---
 
@@ -207,106 +132,96 @@ sudo ufw status
 # View running containers
 docker compose ps
 
-# View app logs
+# View app logs (live)
 docker compose logs -f app
 
 # View database logs
 docker compose logs -f db
 
-# Restart the app (after code changes)
+# Restart the app (after code updates)
 docker compose up -d --build app
 
 # Stop everything
 docker compose down
 
-# Stop and delete database data (⚠️ DESTRUCTIVE)
-docker compose down -v
-
-# Open a shell inside the app container
+# Open a shell inside the app
 docker compose exec app sh
-
-# Run Prisma Studio (DB GUI) — only locally, not in production
-docker compose exec app npx prisma studio
 ```
 
 ---
 
 ## Updating the App
 
-When you push new code:
+When new code is pushed to GitHub:
 
 ```bash
-# On your server
-cd /home/user/finwise
+cd finwise
 git pull
-
-# Rebuild and restart only the app (DB stays running)
 docker compose up -d --build app
-
-# Check it started correctly
 docker compose logs -f app
 ```
 
-Database migrations run automatically on container start via:
-```
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
-```
+Database migrations run automatically on every restart.
 
 ---
 
 ## Backup the Database
 
-Set up automated daily backups:
-
 ```bash
-# Create backup script
-sudo nano /home/user/backup-finwise.sh
-```
+# Manual backup
+docker compose exec -T db pg_dump -U finwise_user finwise_db > backup-$(date +%Y-%m-%d).sql
 
-```bash
-#!/bin/bash
-DATE=$(date +%Y-%m-%d)
-BACKUP_DIR="/home/user/backups/finwise"
-mkdir -p "$BACKUP_DIR"
-
-docker compose -f /home/user/finwise/docker-compose.yml exec -T db \
-  pg_dump -U finwise_user finwise_db > "$BACKUP_DIR/finwise-$DATE.sql"
-
-# Keep only last 30 days
-find "$BACKUP_DIR" -name "*.sql" -mtime +30 -delete
-
-echo "Backup completed: finwise-$DATE.sql"
-```
-
-```bash
-chmod +x /home/user/backup-finwise.sh
-
-# Schedule daily at 2 AM
-crontab -e
-# Add this line:
-0 2 * * * /home/user/backup-finwise.sh >> /var/log/finwise-backup.log 2>&1
-```
-
-**Restore from backup:**
-```bash
-cat /home/user/backups/finwise/finwise-2026-05-14.sql | \
-  docker compose exec -T db psql -U finwise_user finwise_db
+# Restore from backup
+cat backup-2026-05-14.sql | docker compose exec -T db psql -U finwise_user finwise_db
 ```
 
 ---
 
-## Monitoring (Optional)
+## When You Get a Domain Later
 
-```bash
-# Install htop for resource monitoring
-sudo apt install -y htop
+1. Point the domain's A record to your server IP
+2. Update `.env`:
+   ```bash
+   NEXTAUTH_URL=https://yourdomain.com
+   ```
+3. Install Nginx + Certbot for SSL:
+   ```bash
+   sudo apt install -y nginx certbot python3-certbot-nginx
+   sudo certbot --nginx -d yourdomain.com
+   ```
+4. Add Nginx config (see below) and close port 3000:
+   ```bash
+   sudo ufw delete allow 3000
+   sudo ufw allow 'Nginx Full'
+   ```
 
-# Watch Docker container resource usage
-docker stats
+**Nginx config for future use:**
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$host$request_uri;
+}
 
-# Check disk usage
-df -h
-du -sh /var/lib/docker/volumes/
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host       $host;
+        proxy_set_header   X-Real-IP  $remote_addr;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
 ```
 
 ---
@@ -315,33 +230,26 @@ du -sh /var/lib/docker/volumes/
 
 | Problem | Fix |
 |---|---|
-| App not starting | `docker compose logs app` to see error |
-| Database connection refused | Check `DB_PASSWORD` matches in `.env` |
-| 502 Bad Gateway in Nginx | App container may be starting; wait 10s |
-| `NEXTAUTH_URL` mismatch error | Must exactly match your domain with `https://` |
+| Can't open `http://IP:3000` | Check firewall: `sudo ufw status` → port 3000 must show ALLOW |
+| App not starting | `docker compose logs app` to see the error |
+| Database connection refused | Check `DB_PASSWORD` is the same in `.env` for both services |
+| `NEXTAUTH_URL` mismatch | Must be `http://YOUR_SERVER_IP:3000` exactly — no trailing slash |
 | Prisma migration fails | `docker compose exec app npx prisma migrate status` |
 | Out of disk space | `docker system prune -af` to clear unused images |
-| SSL certificate expired | `sudo certbot renew` (auto-renewal should handle this) |
 
 ---
 
-## Architecture Diagram
+## Architecture (IP-only setup)
 
 ```
-Internet
-    │  HTTPS :443
+Browser
+    │  http://YOUR_SERVER_IP:3000
     ▼
-┌─────────────────────┐
-│  Nginx (reverse     │
-│  proxy + SSL)       │
-└────────┬────────────┘
-         │ http://127.0.0.1:3000
-         ▼
 ┌─────────────────────┐     ┌─────────────────────┐
 │  finwise_app        │────▶│  finwise_db          │
 │  (Next.js Docker)   │     │  (PostgreSQL Docker) │
-│  Port: 3000         │     │  Port: 5432          │
-└─────────────────────┘     └─────────────────────┘
-         │
-    Docker Volume: postgres_data (persistent)
+│  Port: 3000 (open)  │     │  Port: 5432 (internal│
+└─────────────────────┘     │  only, not exposed)  │
+                            └─────────────────────┘
+         Docker Volume: postgres_data (persistent)
 ```
