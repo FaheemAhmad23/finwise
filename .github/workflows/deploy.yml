@@ -1,0 +1,92 @@
+name: 🚀 Build & Deploy FinWise
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:    # Allow manual trigger from GitHub UI
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/finwise
+
+jobs:
+  # ── Job 1: Build Docker image and push to GitHub Container Registry ──────────
+  build:
+    name: 🏗️ Build & Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions cache — makes subsequent builds 3-5x faster
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 2: Deploy to production server via SSH ───────────────────────────────
+  deploy:
+    name: 🌐 Deploy to Server
+    runs-on: ubuntu-latest
+    needs: build          # Only runs if build job succeeds
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          port:     ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd /root/finwise
+
+            echo "📦 Logging into GitHub Container Registry..."
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+
+            echo "⬇️  Pulling latest image..."
+            docker compose pull app
+
+            echo "♻️  Restarting app container..."
+            docker compose up -d --no-build app
+
+            echo "🧹 Removing old/unused Docker images..."
+            docker image prune -f
+
+            echo "📋 Last 20 log lines:"
+            docker compose logs --tail=20 app
+
+            echo "✅ Deployment complete!"
