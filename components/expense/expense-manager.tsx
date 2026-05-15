@@ -19,6 +19,7 @@ interface Expense {
 interface BalanceSummary {
   currentBalance: number; savingsBalance: number; totalAssets: number;
   totalEarned: number; totalSpent: number; totalSaved: number; totalLoansOut: number;
+  hasOpeningBalance: boolean;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -33,6 +34,7 @@ const CAT_ICONS: Record<string,string> = {
   'Dining Out':'🍽️', Shopping:'🛍️', 'Salon/Barber':'💈', Other:'📌',
   Salary:'💼', Freelance:'💻', Business:'🏢', Investment:'📈',
   Gift:'🎁', Bonus:'⭐', 'Other Income':'💵', 'Lent Money':'🤝', 'Debt Repaid':'✅',
+  'Savings Withdrawal':'🏦', 'Opening Balance':'🏁', 'Opening Savings':'🏦',
 };
 
 function mKey(d:Date){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
@@ -54,7 +56,16 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
   const [open, setOpen]             = useState(false);
   const [editId, setEditId]         = useState<string|null>(null);
   const [form, setForm]             = useState(EMPTY);
-  const [showChart, setShowChart]   = useState(false);
+  const [showChart, setShowChart]     = useState(false);
+  // Withdraw from savings
+  const [withdrawOpen, setWithdrawOpen]   = useState(false);
+  const [withdrawAmt, setWithdrawAmt]     = useState('');
+  const [withdrawing, setWithdrawing]     = useState(false);
+  // Opening balance setup
+  const [setupOpen, setSetupOpen]         = useState(false);
+  const [setupCurrent, setSetupCurrent]   = useState('');
+  const [setupSavings, setSetupSavings]   = useState('');
+  const [settingUp, setSettingUp]         = useState(false);
 
   const loadMonth = useCallback(async () => {
     setLoading(true);
@@ -85,17 +96,15 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
       const amt = parseFloat(form.amount);
       if (amt > balanceData.currentBalance && balanceData.savingsBalance > 0) {
         const wantWithdraw = confirm(
-          `⚠️ Low Balance Alert!\n\nCurrent Balance: ${balanceData.currentBalance.toLocaleString()} ${currency}\nTransaction: ${amt.toLocaleString()} ${currency}\n\nYour current balance is insufficient. Would you like to withdraw ${(amt - balanceData.currentBalance).toLocaleString()} ${currency} from your Savings Account first?`
+          `⚠️ Low Balance Alert!\n\nCurrent Balance: ${balanceData.currentBalance.toLocaleString()} ${currency}\nTransaction: ${amt.toLocaleString()} ${currency}\n\nWould you like to withdraw ${(amt - balanceData.currentBalance).toLocaleString()} ${currency} from your Savings Account first?`
         );
         if (wantWithdraw) {
-          const withdrawAmt = Math.min(amt - balanceData.currentBalance, balanceData.savingsBalance);
-          // Create savings withdrawal transaction first
+          const withdrawNeeded = Math.min(amt - balanceData.currentBalance, balanceData.savingsBalance);
           await fetch('/api/transactions', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({type:'income',category:'Savings Withdrawal',amount:withdrawAmt,date:form.date,description:'Withdrawn from savings to cover expense'}),
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({type:'income',category:'Savings Withdrawal',amount:withdrawNeeded,date:form.date,description:'[SAVINGS_WITHDRAWAL] Auto-withdrawal to cover expense'}),
           });
-          toast.info(`Withdrew ${withdrawAmt.toLocaleString()} ${currency} from Savings`);
+          toast.info(`Withdrew ${withdrawNeeded.toLocaleString()} ${currency} from Savings`);
         }
       }
     }
@@ -120,6 +129,61 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
   const openEdit  = (e:Expense) => { setForm({type:e.type,category:e.category,amount:e.amount.toString(),date:e.date,description:e.description||''}); setEditId(e.id); setOpen(true); };
   const fmt       = (n:number) => n.toLocaleString('en-US',{maximumFractionDigits:0});
 
+  // ─── Withdraw from savings ─────────────────────────────
+  const handleWithdraw = async () => {
+    const amt = parseFloat(withdrawAmt);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (balanceData && amt > balanceData.savingsBalance) {
+      toast.error(`Only ${fmt(balanceData.savingsBalance)} ${currency} available in savings`);
+      return;
+    }
+    setWithdrawing(true);
+    try {
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'income',
+          category: 'Savings Withdrawal',
+          amount: amt,
+          date: new Date().toISOString().slice(0, 10),
+          description: '[SAVINGS_WITHDRAWAL] Manual withdrawal from savings',
+        }),
+      });
+      toast.success(`${fmt(amt)} ${currency} moved to current balance`);
+      setWithdrawOpen(false); setWithdrawAmt('');
+      await loadMonth(); await loadBalance(); onUpdate();
+    } catch { toast.error('Failed to withdraw'); }
+    finally { setWithdrawing(false); }
+  };
+
+  // ─── Opening balance setup ─────────────────────────────
+  const handleSetupBalance = async () => {
+    const curr = parseFloat(setupCurrent) || 0;
+    const savs = parseFloat(setupSavings) || 0;
+    if (curr <= 0 && savs <= 0) { toast.error('Enter at least one balance'); return; }
+    setSettingUp(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const reqs = [];
+      if (curr > 0) reqs.push(fetch('/api/transactions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'income', category: 'Opening Balance', amount: curr, date: today, description: '[INITIAL_BALANCE] Opening current account balance' }),
+      }));
+      if (savs > 0) reqs.push(fetch('/api/transactions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'income', category: 'Opening Savings', amount: savs, date: today, description: '[INITIAL_SAVINGS] Opening savings account balance' }),
+      }));
+      await Promise.all(reqs);
+      toast.success('Account balances set up successfully!');
+      setSetupOpen(false); setSetupCurrent(''); setSetupSavings('');
+      await loadMonth(); await loadBalance(); onUpdate();
+    } catch { toast.error('Failed to set up balances'); }
+    finally { setSettingUp(false); }
+  };
+
+
+
   const dailyData = expenses.reduce((acc:any[],e) => {
     const day=new Date(e.date).toLocaleDateString('default',{day:'numeric',month:'short'});
     const ex=acc.find(d=>d.date===day);
@@ -143,6 +207,30 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
 
   return (
     <div className="space-y-5">
+
+      {/* ── Opening Balance Setup Banner ──────────────────── */}
+      {balanceData && !balanceData.hasOpeningBalance && expenses.length === 0 && (
+        <div className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+          style={{background:'linear-gradient(135deg, oklch(0.65 0.195 34 / 0.12) 0%, oklch(0.52 0.18 30 / 0.08) 100%)',border:'1px solid oklch(0.65 0.195 34 / 0.25)'}}>
+          <div className="flex-1">
+            <p className="font-bold text-white text-sm">Set up your starting balance</p>
+            <p className="text-xs text-white/45 mt-1">You already have money? Tell FinWise your current balance and savings so your dashboard is accurate from day one.</p>
+          </div>
+          <button onClick={() => setSetupOpen(true)}
+            className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all glow-orange-sm"
+            style={{background:'oklch(0.65 0.195 34)'}}>
+            Set Up Balances
+          </button>
+        </div>
+      )}
+
+      {/* Also show a subtle link if they already have transactions */}
+      {balanceData && !balanceData.hasOpeningBalance && expenses.length > 0 && (
+        <button onClick={() => setSetupOpen(true)}
+          className="text-xs text-white/30 hover:text-primary transition-colors flex items-center gap-1.5">
+          🏁 Set opening balance for accurate history
+        </button>
+      )}
 
       {/* ── Hero Stats Grid ────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -177,9 +265,14 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
           <p className="text-2xl md:text-3xl font-black text-emerald-400 leading-none mb-1">{fmt(sb)}</p>
           <p className="text-xs text-white/30 font-medium">{currency}</p>
           {balanceData && balanceData.totalSaved > 0 && (
-            <p className="mt-3 text-[10px] text-emerald-400/60">
-              +{fmt(monthSaved)} this month
-            </p>
+            <p className="mt-2 text-[10px] text-emerald-400/60">+{fmt(monthSaved)} mo.</p>
+          )}
+          {/* Withdraw button */}
+          {sb > 0 && (
+            <button onClick={() => setWithdrawOpen(true)}
+              className="mt-3 text-[10px] font-bold text-emerald-400/60 hover:text-emerald-400 flex items-center gap-1 transition-colors">
+              ↓ Withdraw
+            </button>
           )}
         </div>
 
@@ -418,6 +511,101 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
           </div>
         )}
       </div>
+      </div>
+
+      {/* ── Withdraw from Savings Modal ──────────────────── */}
+      {withdrawOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-40" onClick={() => setWithdrawOpen(false)}/>
+          <div className="fixed inset-x-4 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[360px] z-50 rounded-t-3xl md:rounded-3xl p-6"
+            style={{background:'oklch(0.13 0.006 260)',border:'1px solid oklch(1 0 0 / 0.10)',boxShadow:'0 24px 80px oklch(0 0 0 / 0.70)'}}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="font-bold text-white">Withdraw from Savings</p>
+                <p className="text-xs text-white/35 mt-0.5">Available: <span className="text-emerald-400 font-bold">{fmt(sb)} {currency}</span></p>
+              </div>
+              <button onClick={() => setWithdrawOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/[0.08] text-white/40 transition-all">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-white/50 block mb-1.5">Amount ({currency})</label>
+                <Input type="number" placeholder="0" step="0.01" value={withdrawAmt}
+                  onChange={e => setWithdrawAmt(e.target.value)}
+                  onKeyDown={e => e.key==='Enter' && handleWithdraw()}
+                  className="rounded-xl text-lg font-bold"/>
+              </div>
+              {withdrawAmt && parseFloat(withdrawAmt) > sb && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-400/5 border border-red-400/15">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0"/>
+                  <p className="text-xs text-red-400/80">Exceeds savings balance of {fmt(sb)} {currency}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                {[25, 50, 75].map(pct => {
+                  const suggestedAmt = Math.round(sb * (pct/100));
+                  return (
+                    <button key={pct} onClick={() => setWithdrawAmt(suggestedAmt.toString())}
+                      className="py-2 rounded-xl text-xs font-semibold text-white/50 hover:text-white transition-all"
+                      style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.07)'}}>
+                      {pct}% · {fmt(suggestedAmt)}
+                    </button>
+                  );
+                })}
+              </div>
+              <Button onClick={handleWithdraw} disabled={!withdrawAmt || parseFloat(withdrawAmt) <= 0 || parseFloat(withdrawAmt) > sb || withdrawing} className="w-full rounded-xl">
+                {withdrawing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Moving funds…</> : `Move to Current Account`}
+              </Button>
+              <p className="text-center text-[11px] text-white/25">This will be recorded as a withdrawal in your statement</p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Opening Balance Setup Modal ──────────────────── */}
+      {setupOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-40" onClick={() => setSetupOpen(false)}/>
+          <div className="fixed inset-x-4 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[400px] z-50 rounded-t-3xl md:rounded-3xl p-6"
+            style={{background:'oklch(0.13 0.006 260)',border:'1px solid oklch(1 0 0 / 0.10)',boxShadow:'0 24px 80px oklch(0 0 0 / 0.70)'}}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-bold text-white">Set Opening Balance</p>
+              <button onClick={() => setSetupOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/[0.08] text-white/40 transition-all">✕</button>
+            </div>
+            <p className="text-xs text-white/40 mb-5">Enter how much money you currently have. This sets your starting point so FinWise shows accurate balances.</p>
+            <div className="space-y-4">
+              {/* Current account */}
+              <div className="rounded-2xl p-4 space-y-3"
+                style={{background:'oklch(0.65 0.195 34 / 0.08)',border:'1px solid oklch(0.65 0.195 34 / 0.18)'}}>
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-primary/80"/>
+                  <p className="text-sm font-semibold text-white">Current Account</p>
+                </div>
+                <Input type="number" placeholder={`Amount in ${currency}`} step="0.01" value={setupCurrent}
+                  onChange={e => setSetupCurrent(e.target.value)} className="rounded-xl"/>
+                <p className="text-[11px] text-white/30">Cash, bank account, wallet — money you spend from day to day</p>
+              </div>
+              {/* Savings account */}
+              <div className="rounded-2xl p-4 space-y-3"
+                style={{background:'oklch(0.72 0.18 150 / 0.08)',border:'1px solid oklch(0.72 0.18 150 / 0.18)'}}>
+                <div className="flex items-center gap-2">
+                  <PiggyBank className="w-4 h-4 text-emerald-400/80"/>
+                  <p className="text-sm font-semibold text-white">Savings Account</p>
+                </div>
+                <Input type="number" placeholder={`Amount in ${currency}`} step="0.01" value={setupSavings}
+                  onChange={e => setSetupSavings(e.target.value)} className="rounded-xl"/>
+                <p className="text-[11px] text-white/30">Money set aside for savings — kept separate from daily spending</p>
+              </div>
+              <Button onClick={handleSetupBalance}
+                disabled={(!setupCurrent || parseFloat(setupCurrent) <= 0) && (!setupSavings || parseFloat(setupSavings) <= 0) || settingUp}
+                className="w-full rounded-xl">
+                {settingUp ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Setting up…</> : 'Confirm Opening Balances'}
+              </Button>
+              <p className="text-center text-[11px] text-white/20">You can update this later by adding an "Opening Balance" transaction</p>
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
