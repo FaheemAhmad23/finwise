@@ -7,23 +7,21 @@ import ExpenseManager from '@/components/expense/expense-manager';
 import DebtManager from '@/components/debt/debt-manager';
 import BillSplit from '@/components/bill/bill-split';
 import ClientsManager from '@/components/clients/clients-manager';
-import InvoiceManager from '@/components/invoices/invoice-manager';
 import {
-  LayoutDashboard, Receipt, Users, CreditCard, SplitSquareVertical,
+  LayoutDashboard, Users, CreditCard, SplitSquareVertical,
   LogOut, Download, Menu, X, ChevronRight,
 } from 'lucide-react';
 
 const NAV = [
-  { id: 'expenses',  label: 'Expenses',  icon: LayoutDashboard, emoji: '📊' },
-  { id: 'invoices',  label: 'Invoices',  icon: Receipt,         emoji: '🧾' },
-  { id: 'clients',   label: 'Clients',   icon: Users,           emoji: '👥' },
-  { id: 'debts',     label: 'Debts',     icon: CreditCard,      emoji: '💳' },
-  { id: 'bills',     label: 'Bill Split',icon: SplitSquareVertical, emoji: '💸' },
+  { id: 'expenses', label: 'Expenses',   emoji: '📊' },
+  { id: 'clients',  label: 'Clients',    emoji: '👥' },
+  { id: 'debts',    label: 'Debts',      emoji: '💳' },
+  { id: 'bills',    label: 'Bill Split', emoji: '💸' },
 ];
 
 export default function Home() {
   const { data: session } = useSession();
-  const [page, setPage]           = useState('expenses');
+  const [page, setPage]             = useState('expenses');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const currency = (session?.user as any)?.currency || 'PKR';
@@ -43,12 +41,18 @@ export default function Home() {
 
   const current = NAV.find(n => n.id === page)!;
 
+  const PAGE_DESC: Record<string, string> = {
+    expenses: 'Track your income and expenses',
+    clients:  'Manage your client directory',
+    debts:    'Track money owed between people',
+    bills:    'Split bills equally among friends',
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
 
-      {/* ── Desktop Sidebar ───────────────────────────────────── */}
+      {/* ── Desktop Sidebar ─────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-56 bg-card border-r border-border fixed top-0 left-0 h-full z-30">
-        {/* Logo */}
         <div className="p-5 border-b border-border">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">💰</span>
@@ -64,7 +68,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Nav Items */}
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map(item => {
             const active = page === item.id;
@@ -86,7 +89,6 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Bottom Actions */}
         <div className="p-3 border-t border-border space-y-1">
           <button
             onClick={handleExportCSV}
@@ -103,17 +105,13 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* ── Mobile Drawer Overlay ─────────────────────────────── */}
+      {/* ── Mobile Drawer Overlay ───────────────────────────── */}
       {drawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          onClick={() => setDrawerOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setDrawerOpen(false)} />
       )}
 
-      {/* ── Mobile Drawer ─────────────────────────────────────── */}
+      {/* ── Mobile Drawer ───────────────────────────────────── */}
       <div className={`fixed top-0 left-0 h-full w-64 bg-card border-r border-border z-50 transform transition-transform duration-300 md:hidden ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        {/* Drawer Header */}
         <div className="p-5 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">💰</span>
@@ -135,7 +133,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Drawer Nav */}
         <nav className="p-3 space-y-1">
           {NAV.map(item => {
             const active = page === item.id;
@@ -156,7 +153,6 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Drawer Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border space-y-1">
           <button
             onClick={handleExportCSV}
@@ -173,46 +169,30 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Main Content ──────────────────────────────────────── */}
+      {/* ── Main Content ────────────────────────────────────── */}
       <main className="flex-1 md:ml-56 min-h-screen flex flex-col">
         {/* Mobile Top Bar */}
         <header className="md:hidden sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="p-2 rounded-xl hover:bg-muted transition-colors"
-          >
+          <button onClick={() => setDrawerOpen(true)} className="p-2 rounded-xl hover:bg-muted transition-colors">
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-2">
             <span className="text-lg">💰</span>
-            <div>
-              <span className="font-bold text-foreground text-sm">FinWise</span>
-              <span className="text-[9px] font-bold tracking-widest text-primary uppercase ml-1">Pro</span>
-            </div>
+            <span className="font-bold text-foreground text-sm">FinWise</span>
+            <span className="text-[9px] font-bold tracking-widest text-primary uppercase">Pro</span>
           </div>
-          <div className="w-9" /> {/* Spacer to center title */}
+          <div className="w-9" />
         </header>
 
-        {/* Page Content */}
+        {/* Page */}
         <div className="flex-1 p-4 md:p-8 max-w-4xl w-full mx-auto">
-          {/* Page Title */}
-          <div className="mb-6 hidden md:flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{current.emoji} {current.label}</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {page === 'expenses'  && 'Track your income and expenses'}
-                {page === 'invoices'  && 'Create and manage professional invoices'}
-                {page === 'clients'   && 'Manage your client directory'}
-                {page === 'debts'     && 'Track money owed between people'}
-                {page === 'bills'     && 'Split bills equally among friends'}
-              </p>
-            </div>
+          <div className="mb-6 hidden md:block">
+            <h1 className="text-2xl font-bold text-foreground">{current.emoji} {current.label}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{PAGE_DESC[page]}</p>
           </div>
 
-          {/* Page Views */}
           <div className="bg-card rounded-2xl border border-border p-4 md:p-6">
             {page === 'expenses' && <ExpenseManager key={refreshTrigger} onUpdate={handleRefresh} />}
-            {page === 'invoices' && <InvoiceManager key={refreshTrigger} onUpdate={handleRefresh} />}
             {page === 'clients'  && <ClientsManager key={refreshTrigger} onUpdate={handleRefresh} />}
             {page === 'debts'    && <DebtManager    key={refreshTrigger} onUpdate={handleRefresh} />}
             {page === 'bills'    && <BillSplit       key={refreshTrigger} onUpdate={handleRefresh} />}
