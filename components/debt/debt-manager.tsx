@@ -246,7 +246,7 @@ function PersonDetail({ person, currency, transactionType, setTransactionType, t
           <h4 className="font-semibold text-foreground text-lg mb-4">History</h4>
           <div className="space-y-3">
             {person.transactions.map(t => (
-              <div key={t.id} className="p-4 bg-muted rounded-xl">
+              <div key={t.id} className="p-4 bg-muted rounded-2xl">
                 <p className={`font-semibold text-base ${t.type === 'lent' ? 'text-red-400' : 'text-green-400'}`}>
                   {t.type === 'lent' ? 'You Lent' : 'They Repaid'} {t.amount.toFixed(0)} {currency}
                 </p>

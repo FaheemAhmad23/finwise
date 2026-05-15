@@ -359,7 +359,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
             {[...expenses]
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((trans) => (
-                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-white/[0.04] transition-colors">
+                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-white/[0.05] transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-foreground text-sm truncate">{trans.category}</p>
