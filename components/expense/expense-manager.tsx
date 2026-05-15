@@ -5,451 +5,356 @@ import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Trash2, Plus, Edit2, ChevronLeft, ChevronRight, FileDown, Loader2 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Trash2, Plus, Edit2, ChevronLeft, ChevronRight, FileDown, Loader2, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateMonthlyPDF } from '@/lib/expense-utils';
 
 interface Expense {
-  id: string;
-  category: string;
-  amount: number;
-  type: 'income' | 'expense';
-  date: string;
-  description: string;
-  isDebtTransaction?: boolean;
-  personName?: string;
-  currency?: string;
+  id: string; category: string; amount: number;
+  type: 'income' | 'expense'; date: string; description: string;
+  isDebtTransaction?: boolean; personName?: string; currency?: string;
 }
 
 const EXPENSE_CATEGORIES = [
-  'Groceries', 'Transportation', 'Utilities', 'Entertainment',
-  'Healthcare', 'Education', 'Rent/Mortgage', 'Savings',
-  'Dining Out', 'Shopping', 'Salon/Barber', 'Other',
+  'Groceries','Transportation','Utilities','Entertainment',
+  'Healthcare','Education','Rent/Mortgage','Savings',
+  'Dining Out','Shopping','Salon/Barber','Other',
 ];
+const INCOME_CATEGORIES = ['Salary','Freelance','Business','Investment','Gift','Bonus','Other Income'];
 
-const INCOME_CATEGORIES = [
-  'Salary', 'Freelance', 'Business', 'Investment', 'Gift', 'Bonus', 'Other Income',
-];
+const CAT_ICONS: Record<string, string> = {
+  Groceries:'🛒', Transportation:'🚗', Utilities:'⚡', Entertainment:'🎬',
+  Healthcare:'💊', Education:'📚', 'Rent/Mortgage':'🏠', Savings:'💰',
+  'Dining Out':'🍽️', Shopping:'🛍️', 'Salon/Barber':'💈', Other:'📌',
+  Salary:'💼', Freelance:'💻', Business:'🏢', Investment:'📈',
+  Gift:'🎁', Bonus:'⭐', 'Other Income':'💵',
+};
 
-const COLORS = ['#6366f1', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#06b6d4'];
-
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+function getMonthKey(d: Date) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function getMonthLabel(key: string) {
+  const [y,m] = key.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleString('default',{month:'long',year:'numeric'});
 }
+function prevMonth(key: string) { const [y,m]=key.split('-').map(Number); return getMonthKey(new Date(y,m-2,1)); }
+function nextMonth(key: string) { const [y,m]=key.split('-').map(Number); return getMonthKey(new Date(y,m,1)); }
 
-function getMonthDisplayName(key: string) {
-  const [year, month] = key.split('-').map(Number);
-  return new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-function getPreviousMonthKey(key: string) {
-  const [year, month] = key.split('-').map(Number);
-  const d = new Date(year, month - 2, 1);
-  return getMonthKey(d);
-}
-
-function getNextMonthKey(key: string) {
-  const [year, month] = key.split('-').map(Number);
-  const d = new Date(year, month, 1);
-  return getMonthKey(d);
-}
+const EMPTY_FORM = { type: 'expense' as 'income'|'expense', category:'', amount:'', date: new Date().toISOString().slice(0,10), description:'' };
 
 export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
   const { data: session } = useSession();
   const currency = (session?.user as any)?.currency || 'PKR';
 
-  const [expenses, setExpenses]       = useState<Expense[]>([]);
-  const [currentMonth, setCurrentMonth] = useState<string>(getMonthKey(new Date()));
-  const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
-  const [open, setOpen]               = useState(false);
-  const [editingId, setEditingId]     = useState<string | null>(null);
-  const [formData, setFormData]       = useState({
-    type: 'expense' as 'income' | 'expense',
-    category: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-  });
+  const [expenses, setExpenses]         = useState<Expense[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(getMonthKey(new Date()));
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
+  const [open, setOpen]                 = useState(false);
+  const [editingId, setEditingId]       = useState<string|null>(null);
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [showChart, setShowChart]       = useState(false);
 
-  // ─── Fetch transactions for the current month ─────────────────────────────
-  const loadExpenses = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/transactions?month=${currentMonth}`);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setExpenses(data);
-    } catch {
-      toast.error('Failed to load transactions');
-    } finally {
-      setLoading(false);
-    }
+      setExpenses(await res.json());
+    } catch { toast.error('Failed to load'); }
+    finally { setLoading(false); }
   }, [currentMonth]);
 
-  useEffect(() => { loadExpenses(); }, [loadExpenses]);
+  useEffect(() => { load(); }, [load]);
 
-  // ─── Derived totals ───────────────────────────────────────────────────────
-  const totalIncome   = expenses.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-  const totalExpenses = expenses.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
-  const closingBalance = totalIncome - totalExpenses;
+  const totalIncome   = expenses.filter(e => e.type==='income').reduce((s,e) => s+e.amount, 0);
+  const totalExpenses = expenses.filter(e => e.type==='expense').reduce((s,e) => s+e.amount, 0);
+  const balance       = totalIncome - totalExpenses;
+  const savingsRate   = totalIncome > 0 ? Math.round((balance / totalIncome) * 100) : 0;
 
-  // ─── Add / Edit transaction ───────────────────────────────────────────────
   const handleSave = async () => {
-    if (!formData.category || !formData.amount) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
+    if (!form.category || !form.amount) { toast.error('Fill all fields'); return; }
     setSaving(true);
     try {
-      if (editingId) {
-        const res = await fetch(`/api/transactions/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: formData.type,
-            category: formData.category,
-            amount: parseFloat(formData.amount),
-            date: formData.date,
-            description: formData.description,
-          }),
-        });
-        if (!res.ok) throw new Error('Update failed');
-        toast.success('Transaction updated');
-      } else {
-        const res = await fetch('/api/transactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: formData.type,
-            category: formData.category,
-            amount: parseFloat(formData.amount),
-            date: formData.date,
-            description: formData.description,
-          }),
-        });
-        if (!res.ok) throw new Error('Create failed');
-        toast.success('Transaction added');
-      }
-
-      resetForm();
-      await loadExpenses();
-      onUpdate();
-    } catch {
-      toast.error('Failed to save transaction');
-    } finally {
-      setSaving(false);
-    }
+      const url    = editingId ? `/api/transactions/${editingId}` : '/api/transactions';
+      const method = editingId ? 'PATCH' : 'POST';
+      const res    = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify({...form, amount: parseFloat(form.amount)}) });
+      if (!res.ok) throw new Error();
+      toast.success(editingId ? 'Updated' : 'Added');
+      resetForm(); await load(); onUpdate();
+    } catch { toast.error('Failed'); }
+    finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
-      toast.success('Transaction deleted');
-      await loadExpenses();
-      onUpdate();
-    } catch {
-      toast.error('Failed to delete transaction');
-    }
+      await fetch(`/api/transactions/${id}`, {method:'DELETE'});
+      toast.success('Deleted'); await load(); onUpdate();
+    } catch { toast.error('Failed'); }
   };
 
-  const handleEdit = (expense: Expense) => {
-    setFormData({
-      type: expense.type,
-      category: expense.category,
-      amount: expense.amount.toString(),
-      date: expense.date,
-      description: expense.description || '',
-    });
-    setEditingId(expense.id);
-    setOpen(true);
-  };
+  const resetForm = () => { setForm(EMPTY_FORM); setEditingId(null); setOpen(false); };
+  const openEdit  = (e: Expense) => { setForm({type:e.type,category:e.category,amount:e.amount.toString(),date:e.date,description:e.description||''}); setEditingId(e.id); setOpen(true); };
 
-  const resetForm = () => {
-    setFormData({
-      type: 'expense',
-      category: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
-      description: '',
-    });
-    setEditingId(null);
-    setOpen(false);
-  };
+  const fmt = (n: number) => n.toLocaleString();
 
-  // ─── Chart data ───────────────────────────────────────────────────────────
-  const categoryBreakdown = Object.entries(
-    expenses.reduce((acc: Record<string, number>, e) => {
-      if (e.type === 'expense') acc[e.category] = (acc[e.category] || 0) + e.amount;
-      return acc;
-    }, {})
-  ).map(([name, value]) => ({ name, value }));
-
+  // Chart data
   const dailyData = expenses.reduce((acc: any[], e) => {
-    const existing = acc.find(d => d.date === e.date);
-    if (existing) {
-      if (e.type === 'income')  existing.income  += e.amount;
-      if (e.type === 'expense') existing.expense += e.amount;
-    } else {
-      acc.push({
-        date: new Date(e.date).toLocaleDateString('default', { day: 'numeric', month: 'short' }),
-        income:  e.type === 'income'  ? e.amount : 0,
-        expense: e.type === 'expense' ? e.amount : 0,
-      });
-    }
+    const day = new Date(e.date).toLocaleDateString('default',{day:'numeric',month:'short'});
+    const ex  = acc.find(d => d.date===day);
+    if (ex) { ex[e.type] = (ex[e.type]||0) + e.amount; }
+    else    { acc.push({date:day, income:0, expense:0, [e.type]:e.amount}); }
     return acc;
-  }, []).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, []);
 
-  // ─── Skeleton loading ────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="space-y-4 pb-4 animate-pulse">
-        <div className="h-14 bg-muted rounded-2xl" />
-        <div className="h-24 bg-muted rounded-2xl" />
-        <div className="grid grid-cols-2 gap-3">
-          <div className="h-20 bg-muted rounded-2xl" />
-          <div className="h-20 bg-muted rounded-2xl" />
-        </div>
-        <div className="h-64 bg-muted rounded-2xl" />
+  if (loading) return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-10 bg-muted rounded-2xl w-48 mx-auto" />
+      <div className="grid grid-cols-3 gap-3">
+        <div className="col-span-2 h-36 bg-muted rounded-2xl" />
+        <div className="space-y-3"><div className="h-16 bg-muted rounded-2xl"/><div className="h-16 bg-muted rounded-2xl"/></div>
       </div>
-    );
-  }
+      <div className="h-64 bg-muted rounded-2xl" />
+    </div>
+  );
+
+  const sorted = [...expenses].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="space-y-3 md:space-y-6 pb-4">
-      {/* Month Navigation */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20 py-3 md:py-4">
-        <div className="flex items-center justify-between gap-2 md:gap-6">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(getPreviousMonthKey(currentMonth))} className="h-10 w-10 p-0 flex-shrink-0">
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
+    <div className="space-y-5">
 
-          <div className="text-center flex-1 min-w-0">
-            <h2 className="text-lg md:text-2xl font-semibold truncate">{getMonthDisplayName(currentMonth)}</h2>
-          </div>
+      {/* ── Month Nav ──────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => setCurrentMonth(prevMonth(currentMonth))}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-white/50 hover:text-white transition-all">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Button
-              variant="ghost" size="sm"
-              onClick={async () => {
-                try {
-                  const pdf = await generateMonthlyPDF(
-                    getMonthDisplayName(currentMonth),
-                    expenses, totalIncome, totalExpenses, closingBalance, 0
-                  );
-                  pdf.save(`FinWise-${currentMonth}.pdf`);
-                  toast.success('PDF downloaded');
-                } catch {
-                  toast.error('Failed to generate PDF');
-                }
-              }}
-              className="h-10 w-10 p-0"
-              title="Download PDF"
-            >
-              <FileDown className="w-5 h-5" />
-            </Button>
+        <div className="text-center">
+          <h2 className="text-base font-bold text-white">{getMonthLabel(currentMonth)}</h2>
+          <p className="text-xs text-white/30 mt-0.5">{expenses.length} transactions</p>
+        </div>
 
-            <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(getNextMonthKey(currentMonth))} className="h-10 w-10 p-0 flex-shrink-0">
-              <ChevronRight className="w-5 h-5" />
-            </Button>
-          </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={async () => {
+              try { const pdf = await generateMonthlyPDF(getMonthLabel(currentMonth),expenses,totalIncome,totalExpenses,balance,0); pdf.save(`FinWise-${currentMonth}.pdf`); toast.success('PDF ready'); }
+              catch { toast.error('PDF failed'); }
+            }}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-white/50 hover:text-white transition-all"
+            title="Download PDF"
+          >
+            <FileDown className="w-4 h-4" />
+          </button>
+          <button onClick={() => setCurrentMonth(nextMonth(currentMonth))}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-white/50 hover:text-white transition-all">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="space-y-2 md:space-y-3 px-4 md:px-0">
-        <div className="grid grid-cols-2 gap-2 md:gap-3">
-          <div className="rounded-2xl bg-green-500/10 p-4 md:p-6 border border-green-500/20">
-            <p className="text-xs md:text-sm text-muted-foreground font-medium">Income</p>
-            <p className="text-xl md:text-2xl font-semibold text-green-400 mt-1">
-              {totalIncome.toLocaleString()} <span className="text-sm">{currency}</span>
-            </p>
-          </div>
-          <div className="rounded-2xl bg-red-500/10 p-4 md:p-6 border border-red-500/20">
-            <p className="text-xs md:text-sm text-muted-foreground font-medium">Expenses</p>
-            <p className="text-xl md:text-2xl font-semibold text-red-400 mt-1">
-              {totalExpenses.toLocaleString()} <span className="text-sm">{currency}</span>
-            </p>
-          </div>
-        </div>
+      {/* ── Hero Stats Grid ────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
 
-        <div className={`rounded-2xl p-4 md:p-6 border ${closingBalance >= 0 ? 'bg-primary/10 border-primary/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
-          <p className="text-xs md:text-sm text-muted-foreground font-medium">Net Balance</p>
-          <p className={`text-2xl md:text-3xl font-semibold mt-1 ${closingBalance >= 0 ? 'text-primary' : 'text-amber-400'}`}>
-            {closingBalance >= 0 ? '+' : ''}{closingBalance.toLocaleString()} <span className="text-lg">{currency}</span>
+        {/* Balance — Hero Card (takes 2 cols) */}
+        <div className="col-span-2 relative overflow-hidden rounded-2xl p-5"
+          style={{ background: 'linear-gradient(135deg, oklch(0.17 0.008 265) 0%, oklch(0.13 0.006 265) 100%)', border: '1px solid oklch(1 0 0 / 0.08)', boxShadow: '0 4px 24px oklch(0 0 0 / 0.35)' }}
+        >
+          {/* Background glow */}
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
+            style={{background: balance >= 0 ? 'radial-gradient(circle, #4ade80, transparent)' : 'radial-gradient(circle, #f87171, transparent)', filter: 'blur(30px)'}} />
+
+          <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Net Balance</p>
+          <p className={`text-3xl md:text-4xl font-black leading-none mb-1 ${balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {balance >= 0 ? '+' : ''}{fmt(balance)}
           </p>
+          <p className="text-sm text-white/30 font-medium">{currency}</p>
+
+          <div className="mt-4 flex items-center gap-2">
+            <div className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${balance >= 0 ? 'bg-emerald-400/10 text-emerald-400' : 'bg-red-400/10 text-red-400'}`}>
+              {balance >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {savingsRate}% saved
+            </div>
+          </div>
+        </div>
+
+        {/* Right column — Income + Expenses stacked */}
+        <div className="flex flex-col gap-3">
+          {/* Income */}
+          <div className="flex-1 rounded-2xl p-4 relative overflow-hidden"
+            style={{ background: 'oklch(0.72 0.18 150 / 0.10)', border: '1px solid oklch(0.72 0.18 150 / 0.18)', boxShadow: '0 4px 16px oklch(0 0 0 / 0.25)' }}
+          >
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-2">Income</p>
+            <p className="text-lg font-black text-emerald-400 leading-none">{fmt(totalIncome)}</p>
+            <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+            <TrendingUp className="absolute bottom-3 right-3 w-5 h-5 text-emerald-400/20" />
+          </div>
+
+          {/* Expenses */}
+          <div className="flex-1 rounded-2xl p-4 relative overflow-hidden"
+            style={{ background: 'oklch(0.62 0.22 27 / 0.10)', border: '1px solid oklch(0.62 0.22 27 / 0.18)', boxShadow: '0 4px 16px oklch(0 0 0 / 0.25)' }}
+          >
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-2">Spent</p>
+            <p className="text-lg font-black text-red-400 leading-none">{fmt(totalExpenses)}</p>
+            <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+            <TrendingDown className="absolute bottom-3 right-3 w-5 h-5 text-red-400/20" />
+          </div>
         </div>
       </div>
 
-      {/* Transactions */}
-      <div className="rounded-3xl border border-border bg-card overflow-hidden mx-4 md:mx-0">
-        <div className="p-4 md:p-6 border-b border-white/[0.06] flex items-center justify-between">
+      {/* ── Trend Chart (toggle) ───────────────────────────── */}
+      {expenses.length > 0 && (
+        <div>
+          <button onClick={() => setShowChart(v => !v)}
+            className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1.5 transition-colors mb-3">
+            <ArrowUpRight className="w-3 h-3" />
+            {showChart ? 'Hide' : 'Show'} monthly trend
+          </button>
+          {showChart && (
+            <div className="rounded-2xl p-4" style={{background:'oklch(0.13 0.006 260)', border:'1px solid oklch(1 0 0 / 0.07)'}}>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={dailyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="date" stroke="rgba(255,255,255,0.20)" style={{fontSize:'10px'}} tickLine={false} axisLine={false} />
+                  <YAxis stroke="rgba(255,255,255,0.20)" style={{fontSize:'10px'}} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    formatter={(v:any) => `${Number(v).toLocaleString()} ${currency}`}
+                    contentStyle={{background:'oklch(0.16 0.007 260)',border:'1px solid oklch(1 0 0 / 0.10)',borderRadius:'12px',color:'white',fontSize:'12px'}}
+                  />
+                  <Line type="monotone" dataKey="income"  stroke="#4ade80" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="expense" stroke="#e8622a" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-4 mt-2 justify-center">
+                <span className="flex items-center gap-1.5 text-xs text-white/35"><span className="w-3 h-0.5 bg-emerald-400 rounded inline-block"/>Income</span>
+                <span className="flex items-center gap-1.5 text-xs text-white/35"><span className="w-3 h-0.5 bg-primary rounded inline-block"/>Spending</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Statement ─────────────────────────────────────── */}
+      <div>
+        {/* Statement header */}
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-foreground text-sm md:text-base">Transactions</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} this month</p>
+            <h3 className="font-bold text-white text-sm">Statement</h3>
+            <p className="text-xs text-white/30 mt-0.5">{getMonthLabel(currentMonth)}</p>
           </div>
 
-          <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); setOpen(v); }}>
+          {/* Add button */}
+          <Dialog open={open} onOpenChange={v => { if (!v) resetForm(); setOpen(v); }}>
             <DialogTrigger asChild>
-              <Button size="sm" onClick={resetForm} className="rounded-full h-10 w-10 p-0 md:h-auto md:w-auto md:px-4">
-                <Plus className="w-5 h-5 md:w-4 md:h-4 md:mr-2" />
-                <span className="hidden md:inline">Add</span>
-              </Button>
+              <button onClick={resetForm}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all glow-orange-sm"
+                style={{background:'oklch(0.65 0.195 34)'}}>
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
             </DialogTrigger>
-            <DialogContent className="rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>{editingId ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Type</label>
-                  <select
-                    className="w-full rounded-xl border border-border bg-card text-foreground px-4 py-2.5 text-sm"
-                    value={formData.type}
-                    onChange={(e: any) => setFormData({ ...formData, type: e.target.value, category: '' })}
-                  >
-                    <option value="income">Income</option>
-                    <option value="expense">Expense</option>
-                  </select>
+            <DialogContent className="rounded-2xl max-w-sm">
+              <DialogHeader><DialogTitle>{editingId ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-1">
+                {/* Type toggle */}
+                <div className="grid grid-cols-2 gap-2">
+                  {(['expense','income'] as const).map(t => (
+                    <button key={t} onClick={() => setForm({...form, type:t, category:''})}
+                      className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${form.type===t ? 'bg-primary text-white' : 'bg-white/[0.05] text-white/50 hover:text-white'}`}>
+                      {t === 'expense' ? '↑ Expense' : '↓ Income'}
+                    </button>
+                  ))}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <select
-                    className="w-full rounded-xl border border-border bg-card text-foreground px-4 py-2.5 text-sm"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  >
+                  <label className="text-sm font-medium text-white/70">Category</label>
+                  <select className="w-full rounded-xl border border-border bg-card text-foreground px-4 py-2.5 text-sm"
+                    value={form.category} onChange={e => setForm({...form, category:e.target.value})}>
                     <option value="">Select category</option>
-                    {(formData.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {(form.type==='income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount ({currency})</label>
-                  <Input type="number" placeholder="0.00" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} className="rounded-xl" />
+                  <label className="text-sm font-medium text-white/70">Amount ({currency})</label>
+                  <Input type="number" placeholder="0.00" step="0.01" value={form.amount}
+                    onChange={e => setForm({...form, amount:e.target.value})} className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="rounded-xl" />
+                  <label className="text-sm font-medium text-white/70">Date</label>
+                  <Input type="date" value={form.date} onChange={e => setForm({...form, date:e.target.value})} className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Notes</label>
-                  <Input placeholder="Optional…" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="rounded-xl" />
+                  <label className="text-sm font-medium text-white/70">Notes</label>
+                  <Input placeholder="Optional…" value={form.description}
+                    onChange={e => setForm({...form, description:e.target.value})} className="rounded-xl" />
                 </div>
                 <Button onClick={handleSave} className="w-full rounded-xl" disabled={saving}>
-                  {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : `${editingId ? 'Save' : 'Add'} Transaction`}
+                  {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Saving…</> : editingId ? 'Save Changes' : 'Add Transaction'}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
+        {/* Transaction list */}
         {expenses.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-muted-foreground text-sm">No transactions for this month</p>
-            <p className="text-xs text-muted-foreground mt-1">Tap + to add your first transaction</p>
+          <div className="py-16 text-center">
+            <p className="text-4xl mb-3">💸</p>
+            <p className="text-white/40 text-sm font-medium">No transactions yet</p>
+            <p className="text-white/20 text-xs mt-1">Tap Add to log your first entry</p>
           </div>
         ) : (
-          <div className="divide-y divide-white/[0.06]">
-            {[...expenses]
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .map((trans) => (
-                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-white/[0.05] transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-foreground text-sm truncate">{trans.category}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap font-medium ${
-                        trans.isDebtTransaction ? 'bg-purple-500/20 text-purple-400'
-                          : trans.type === 'income' ? 'bg-green-500/20 text-green-400'
-                          : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {trans.isDebtTransaction ? (trans.type === 'expense' ? 'Lent' : 'Repaid') : trans.type === 'income' ? 'In' : 'Out'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(trans.date).toLocaleDateString('default', { month: 'short', day: 'numeric' })}
-                      {trans.personName && <span> · {trans.personName}</span>}
-                    </p>
-                    {trans.description && <p className="text-xs text-muted-foreground mt-1 truncate">{trans.description}</p>}
+          <div className="space-y-1.5">
+            {sorted.map(t => (
+              <div key={t.id}
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl group transition-all hover:bg-white/[0.04]"
+                style={{border:'1px solid transparent'}}
+                onMouseEnter={e => (e.currentTarget.style.borderColor='oklch(1 0 0 / 0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor='transparent')}
+              >
+                {/* Category icon */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${t.type==='income' ? 'bg-emerald-400/10' : 'bg-primary/10'}`}>
+                  {CAT_ICONS[t.category] || '📌'}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-white text-sm truncate">{t.category}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                      t.isDebtTransaction ? 'bg-violet-500/15 text-violet-400'
+                      : t.type==='income' ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'bg-primary/15 text-primary'}`}>
+                      {t.isDebtTransaction ? (t.type==='expense'?'Lent':'Repaid') : t.type==='income' ? 'IN' : 'OUT'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 md:gap-3 ml-3">
-                    <p className={`font-semibold text-sm md:text-base min-w-fit ${trans.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
-                      {trans.type === 'income' ? '+' : '-'}{trans.amount.toLocaleString()}
-                    </p>
-                    <div className="flex gap-1">
-                      {!trans.isDebtTransaction && (
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(trans)} className="h-8 w-8 p-0 hover:bg-muted">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(trans.id)} className="h-8 w-8 p-0 hover:bg-red-500/10">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </Button>
-                    </div>
+                  <p className="text-xs text-white/30 mt-0.5">
+                    {new Date(t.date).toLocaleDateString('default',{month:'short',day:'numeric'})}
+                    {t.description && ` · ${t.description}`}
+                  </p>
+                </div>
+
+                {/* Amount */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <p className={`font-bold text-base tabular-nums ${t.type==='income' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {t.type==='income' ? '+' : '-'}{fmt(t.amount)}
+                  </p>
+
+                  {/* Actions — show on hover */}
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!t.isDebtTransaction && (
+                      <button onClick={() => openEdit(t)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-white/30 hover:text-white transition-all">
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button onClick={() => handleDelete(t.id)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      {/* Charts */}
-      {expenses.length > 0 && (
-        <div className="space-y-3 md:space-y-6 px-4 md:px-0">
-          <Tabs defaultValue="category" className="w-full">
-            <TabsList className="w-full rounded-full bg-muted p-1 grid grid-cols-2">
-              <TabsTrigger value="category" className="rounded-full text-xs md:text-sm">Categories</TabsTrigger>
-              <TabsTrigger value="daily"    className="rounded-full text-xs md:text-sm">Daily Trend</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="category" className="mt-4 rounded-2xl border border-border bg-card p-4 md:p-6">
-              {categoryBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie data={categoryBreakdown} cx="50%" cy="50%" labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80} dataKey="value"
-                    >
-                      {categoryBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`}
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">No expense data</div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="daily" className="mt-4 rounded-2xl border border-border bg-card p-4 md:p-6">
-              {dailyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={dailyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="date" stroke="#475569" style={{ fontSize: '11px' }} />
-                    <YAxis stroke="#475569" style={{ fontSize: '11px' }} />
-                    <Tooltip
-                      formatter={(v: any) => `${Number(v).toLocaleString()} ${currency}`}
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
-                    />
-                    <Line type="monotone" dataKey="income"  stroke="#4ade80" strokeWidth={2} dot={false} name="Income" />
-                    <Line type="monotone" dataKey="expense" stroke="#f87171" strokeWidth={2} dot={false} name="Expense" />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">No trend data</div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
     </div>
   );
 }

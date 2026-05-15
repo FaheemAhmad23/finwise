@@ -4,23 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, X, ChevronLeft, Loader2 } from 'lucide-react';
+import { Trash2, Plus, X, ChevronLeft, Loader2, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface DebtTransaction {
-  id: string;
-  type: 'lent' | 'repaid';
-  amount: number;
-  note: string | null;
-  date: string;
-}
-
-interface Person {
-  id: string;
-  name: string;
-  balance: number;
-  transactions: DebtTransaction[];
-}
+interface DebtTransaction { id: string; type: 'lent'|'repaid'; amount: number; note: string|null; date: string; }
+interface Person { id: string; name: string; balance: number; transactions: DebtTransaction[]; }
 
 export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
   const { data: session } = useSession();
@@ -28,234 +16,257 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
 
   const [people, setPeople]               = useState<Person[]>([]);
   const [loading, setLoading]             = useState(true);
-  const [searchTerm, setSearchTerm]       = useState('');
-  const [newPersonName, setNewPersonName] = useState('');
+  const [newName, setNewName]             = useState('');
   const [addingPerson, setAddingPerson]   = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-  const [transactionType, setTransactionType] = useState<'lent' | 'repaid'>('lent');
-  const [transactionAmount, setTransactionAmount] = useState('');
-  const [transactionNote, setTransactionNote]     = useState('');
+  const [selectedPerson, setSelectedPerson] = useState<Person|null>(null);
+  const [txType, setTxType]               = useState<'lent'|'repaid'>('lent');
+  const [txAmount, setTxAmount]           = useState('');
+  const [txNote, setTxNote]               = useState('');
   const [submitting, setSubmitting]       = useState(false);
 
-  const loadPeople = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await fetch('/api/people');
-      if (!res.ok) throw new Error();
-      setPeople(await res.json());
-    } catch {
-      toast.error('Failed to load people');
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await fetch('/api/people'); setPeople(await r.json()); }
+    catch { toast.error('Failed to load'); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadPeople(); }, [loadPeople]);
+  useEffect(() => { load(); }, [load]);
 
   const addPerson = async () => {
-    if (!newPersonName.trim()) { toast.error('Enter a name'); return; }
+    if (!newName.trim()) return;
     setAddingPerson(true);
     try {
-      const res = await fetch('/api/people', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newPersonName.trim() }),
-      });
-      if (!res.ok) throw new Error();
-      const p = await res.json();
-      setPeople(prev => [...prev, p].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewPersonName('');
-      toast.success(`${p.name} added`);
-      onUpdate();
-    } catch { toast.error('Failed to add person'); }
+      const r = await fetch('/api/people', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newName.trim()})});
+      const p = await r.json();
+      setPeople(prev => [...prev, p].sort((a,b) => a.name.localeCompare(b.name)));
+      setNewName(''); toast.success(`${p.name} added`); onUpdate();
+    } catch { toast.error('Failed'); }
     finally { setAddingPerson(false); }
   };
 
   const addTransaction = async () => {
-    if (!selectedPerson || !transactionAmount || parseFloat(transactionAmount) <= 0) return;
+    if (!selectedPerson || !txAmount || parseFloat(txAmount) <= 0) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/people/${selectedPerson.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: transactionType, amount: parseFloat(transactionAmount), note: transactionNote || null }),
-      });
-      if (!res.ok) throw new Error();
-      const updated = await res.json();
+      const r = await fetch(`/api/people/${selectedPerson.id}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:txType,amount:parseFloat(txAmount),note:txNote||null})});
+      const updated = await r.json();
       setPeople(prev => prev.map(p => p.id === updated.id ? updated : p));
-      setSelectedPerson(updated);
-      setTransactionAmount('');
-      setTransactionNote('');
-      toast.success(`Recorded for ${selectedPerson.name}`);
-      onUpdate();
-    } catch { toast.error('Failed to record transaction'); }
+      setSelectedPerson(updated); setTxAmount(''); setTxNote('');
+      toast.success('Recorded'); onUpdate();
+    } catch { toast.error('Failed'); }
     finally { setSubmitting(false); }
   };
 
   const deletePerson = async (id: string) => {
-    const person = people.find(p => p.id === id);
-    if (!confirm(`Delete ${person?.name} and all their transactions?`)) return;
+    const p = people.find(p => p.id === id);
+    if (!confirm(`Delete ${p?.name}?`)) return;
     try {
-      await fetch(`/api/people/${id}`, { method: 'DELETE' });
+      await fetch(`/api/people/${id}`,{method:'DELETE'});
       setPeople(prev => prev.filter(p => p.id !== id));
       if (selectedPerson?.id === id) setSelectedPerson(null);
-      toast.success('Person deleted');
-      onUpdate();
-    } catch { toast.error('Failed to delete'); }
+      toast.success('Deleted'); onUpdate();
+    } catch { toast.error('Failed'); }
   };
 
-  const filteredPeople = people.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  const netBalance = people.reduce((s, p) => s + p.balance, 0);
+  const netBalance  = people.reduce((s,p) => s+p.balance, 0);
+  const totalOwed   = people.filter(p => p.balance > 0).reduce((s,p) => s+p.balance, 0);
+  const totalOwe    = people.filter(p => p.balance < 0).reduce((s,p) => s+Math.abs(p.balance), 0);
+  const fmt         = (n: number) => Math.abs(n).toLocaleString();
 
   if (loading) return (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-24 bg-muted rounded-2xl" />
-      <div className="h-12 bg-muted rounded-2xl" />
-      <div className="grid grid-cols-2 gap-3">
-        {[1,2,3,4].map(i => <div key={i} className="h-28 bg-muted rounded-2xl" />)}
-      </div>
+    <div className="animate-pulse space-y-4">
+      <div className="grid grid-cols-3 gap-3">{[1,2,3].map(i=><div key={i} className="h-24 bg-muted rounded-2xl"/>)}</div>
+      <div className="h-10 bg-muted rounded-2xl"/><div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-16 bg-muted rounded-2xl"/>)}</div>
     </div>
   );
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Net Balance */}
-      <div className={`rounded-2xl p-4 md:p-6 border ${netBalance > 0 ? 'bg-green-500/10 border-green-500/20' : netBalance < 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-muted border-border'}`}>
-        <p className="text-xs md:text-sm text-muted-foreground font-medium">Net Balance</p>
-        <p className={`text-2xl md:text-3xl font-semibold mt-1 ${netBalance > 0 ? 'text-green-400' : netBalance < 0 ? 'text-red-400' : 'text-foreground'}`}>
-          {netBalance > 0 ? '+' : ''}{netBalance.toFixed(2)} {currency}
-        </p>
-        <p className="text-xs text-muted-foreground mt-2">{netBalance > 0 ? 'People owe you' : netBalance < 0 ? 'You owe people' : 'All balanced'}</p>
-      </div>
+    <div className="space-y-5">
 
-      {/* Add Person */}
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="flex gap-2">
-          <Input placeholder="Add person by name…" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPerson()} className="rounded-lg" />
-          <Button onClick={addPerson} className="rounded-lg px-3" size="sm" disabled={addingPerson}>
-            {addingPerson ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          </Button>
+      {/* ── Hero + Side Stats ──────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Net hero */}
+        <div className="col-span-2 relative overflow-hidden rounded-2xl p-5"
+          style={{background:'linear-gradient(135deg, oklch(0.17 0.008 265) 0%, oklch(0.13 0.006 265) 100%)',border:'1px solid oklch(1 0 0 / 0.08)',boxShadow:'0 4px 24px oklch(0 0 0 / 0.35)'}}>
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
+            style={{background: netBalance>0?'radial-gradient(circle,#4ade80,transparent)':'radial-gradient(circle,#f87171,transparent)',filter:'blur(30px)'}}/>
+          <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Net Position</p>
+          <p className={`text-3xl md:text-4xl font-black leading-none mb-1 ${netBalance>0?'text-emerald-400':netBalance<0?'text-red-400':'text-white/60'}`}>
+            {netBalance>0?'+':''}{fmt(netBalance)}
+          </p>
+          <p className="text-sm text-white/30 font-medium">{currency}</p>
+          <div className="mt-4">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${netBalance>0?'bg-emerald-400/10 text-emerald-400':netBalance<0?'bg-red-400/10 text-red-400':'bg-white/5 text-white/40'}`}>
+              {netBalance>0?'You are owed overall':netBalance<0?'You owe overall':'All balanced'}
+            </span>
+          </div>
+        </div>
+
+        {/* Side stats */}
+        <div className="flex flex-col gap-3">
+          <div className="flex-1 rounded-2xl p-4 relative overflow-hidden"
+            style={{background:'oklch(0.72 0.18 150 / 0.10)',border:'1px solid oklch(0.72 0.18 150 / 0.18)'}}>
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-2">Owed to You</p>
+            <p className="text-lg font-black text-emerald-400 leading-none">{fmt(totalOwed)}</p>
+            <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+            <TrendingUp className="absolute bottom-3 right-3 w-5 h-5 text-emerald-400/20"/>
+          </div>
+          <div className="flex-1 rounded-2xl p-4 relative overflow-hidden"
+            style={{background:'oklch(0.62 0.22 27 / 0.10)',border:'1px solid oklch(0.62 0.22 27 / 0.18)'}}>
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-2">You Owe</p>
+            <p className="text-lg font-black text-red-400 leading-none">{fmt(totalOwe)}</p>
+            <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+            <TrendingDown className="absolute bottom-3 right-3 w-5 h-5 text-red-400/20"/>
+          </div>
         </div>
       </div>
 
-      {people.length > 3 && (
-        <Input placeholder="Search person…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="rounded-lg" />
-      )}
+      {/* ── Add Person ─────────────────────────────────────── */}
+      <div className="flex gap-2">
+        <Input placeholder="Add person by name…" value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key==='Enter' && addPerson()}
+          className="rounded-xl flex-1"
+        />
+        <button onClick={addPerson} disabled={addingPerson}
+          className="px-4 rounded-xl text-white font-semibold text-sm flex items-center gap-2 glow-orange-sm transition-all"
+          style={{background:'oklch(0.65 0.195 34)'}}>
+          {addingPerson ? <Loader2 className="w-4 h-4 animate-spin"/> : <><Plus className="w-4 h-4"/>Add</>}
+        </button>
+      </div>
 
-      {/* People Grid */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        {filteredPeople.length === 0 ? (
-          <div className="text-center py-12 px-4 text-muted-foreground">
-            <p className="text-2xl mb-2">👥</p>
-            <p className="text-sm">{searchTerm ? 'No person found' : 'Add someone to track debts with'}</p>
+      {/* ── People List ────────────────────────────────────── */}
+      {people.length === 0 ? (
+        <div className="py-16 text-center">
+          <Users className="w-12 h-12 mx-auto mb-4 text-white/10"/>
+          <p className="text-white/40 text-sm font-medium">No people yet</p>
+          <p className="text-white/20 text-xs mt-1">Add someone to start tracking debts</p>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-white text-sm">People <span className="text-white/30 font-normal">({people.length})</span></h3>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-white/[0.06]">
-            {filteredPeople.map(person => (
-              <div key={person.id} className="relative group">
-                <button
-                  onClick={() => { setSelectedPerson(person); setTransactionType('lent'); setTransactionAmount(''); setTransactionNote(''); }}
-                  className={`w-full p-3 md:p-4 text-left transition-colors hover:bg-white/[0.05] ${person.balance > 0 ? 'hover:bg-green-500/10' : person.balance < 0 ? 'hover:bg-red-500/10' : ''}`}
-                >
-                  <p className="font-semibold text-sm md:text-base truncate text-foreground">{person.name}</p>
-                  <p className={`text-lg md:text-2xl font-bold mt-2 ${person.balance > 0 ? 'text-green-400' : person.balance < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
-                    {person.balance > 0 ? '+' : ''}{Math.abs(person.balance).toFixed(0)}
+          <div className="space-y-1.5">
+            {people.map(person => (
+              <div key={person.id}
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl group transition-all cursor-pointer hover:bg-white/[0.04]"
+                style={{border:'1px solid transparent'}}
+                onMouseEnter={e=>(e.currentTarget.style.borderColor='oklch(1 0 0 / 0.06)')}
+                onMouseLeave={e=>(e.currentTarget.style.borderColor='transparent')}
+                onClick={() => { setSelectedPerson(person); setTxType('lent'); setTxAmount(''); setTxNote(''); }}
+              >
+                {/* Avatar */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${person.balance>0?'bg-emerald-400/10 text-emerald-400':person.balance<0?'bg-red-400/10 text-red-400':'bg-white/5 text-white/40'}`}>
+                  {person.name.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm">{person.name}</p>
+                  <p className="text-xs text-white/30 mt-0.5">
+                    {person.transactions.length} transaction{person.transactions.length !== 1 ? 's' : ''}
+                    {person.balance === 0 && ' · Settled'}
                   </p>
-                  <p className="text-xs md:text-sm text-muted-foreground mt-1">{person.balance > 0 ? 'Owes you' : person.balance < 0 ? 'You owe' : 'Settled'}</p>
-                </button>
-                <button onClick={e => { e.stopPropagation(); deletePerson(person.id); }} className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-md">
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                </button>
+                </div>
+
+                {/* Balance */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <p className={`font-bold text-base tabular-nums ${person.balance>0?'text-emerald-400':person.balance<0?'text-red-400':'text-white/30'}`}>
+                    {person.balance>0?'+':''}{person.balance !== 0 ? fmt(person.balance) : '0'}
+                  </p>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${person.balance>0?'bg-emerald-400/10 text-emerald-400':person.balance<0?'bg-red-400/10 text-red-400':'bg-white/5 text-white/40'}`}>
+                    {person.balance>0?'OWES':'OWED'}
+                  </span>
+
+                  {/* Delete on hover */}
+                  <button
+                    onClick={e => { e.stopPropagation(); deletePerson(person.id); }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all">
+                    <Trash2 className="w-3 h-3"/>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Person Modal */}
+      {/* ── Person Detail Modal ────────────────────────────── */}
       {selectedPerson && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSelectedPerson(null)} />
-          <div className="md:hidden fixed inset-0 z-50 bg-card overflow-y-auto flex flex-col">
-            <div className="sticky top-0 bg-card p-4 border-b border-white/[0.06] flex items-center justify-between shadow-sm">
-              <button onClick={() => setSelectedPerson(null)}><ChevronLeft className="w-6 h-6" /></button>
-              <h3 className="text-lg font-bold">{selectedPerson.name}</h3>
-              <div className="w-6" />
-            </div>
-            <PersonDetail person={selectedPerson} currency={currency} transactionType={transactionType} setTransactionType={setTransactionType} transactionAmount={transactionAmount} setTransactionAmount={setTransactionAmount} transactionNote={transactionNote} setTransactionNote={setTransactionNote} onAdd={addTransaction} submitting={submitting} />
-          </div>
+          <div className="fixed inset-0 bg-black/70 z-40" onClick={() => setSelectedPerson(null)}/>
+          <div className="fixed inset-x-4 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[420px] z-50 rounded-t-3xl md:rounded-3xl overflow-hidden max-h-[90vh] flex flex-col"
+            style={{background:'oklch(0.13 0.006 260)',border:'1px solid oklch(1 0 0 / 0.10)',boxShadow:'0 24px 80px oklch(0 0 0 / 0.70)'}}>
 
-          <div className="hidden md:flex fixed inset-0 bg-black/60 z-50 items-center justify-center p-4" onClick={() => setSelectedPerson(null)}>
-            <div className="bg-card rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-border" onClick={e => e.stopPropagation()}>
-              <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
-                <h3 className="text-2xl font-bold">{selectedPerson.name}</h3>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedPerson(null)} className="h-8 w-8 p-0"><X className="w-5 h-5" /></Button>
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-5 border-b" style={{borderColor:'oklch(1 0 0 / 0.07)'}}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${selectedPerson.balance>0?'bg-emerald-400/10 text-emerald-400':selectedPerson.balance<0?'bg-red-400/10 text-red-400':'bg-white/5 text-white/40'}`}>
+                  {selectedPerson.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-white">{selectedPerson.name}</p>
+                  <p className={`text-xs font-semibold ${selectedPerson.balance>0?'text-emerald-400':selectedPerson.balance<0?'text-red-400':'text-white/30'}`}>
+                    {selectedPerson.balance>0?`Owes you ${fmt(selectedPerson.balance)}`:selectedPerson.balance<0?`You owe ${fmt(selectedPerson.balance)}`:'Settled up'} {currency}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto">
-                <PersonDetail person={selectedPerson} currency={currency} transactionType={transactionType} setTransactionType={setTransactionType} transactionAmount={transactionAmount} setTransactionAmount={setTransactionAmount} transactionNote={transactionNote} setTransactionNote={setTransactionNote} onAdd={addTransaction} submitting={submitting} />
+              <button onClick={() => setSelectedPerson(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-white/[0.08] text-white/40 hover:text-white transition-all">
+                <X className="w-4 h-4"/>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Record transaction */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Record Transaction</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['lent','repaid'] as const).map(t => (
+                    <button key={t} onClick={() => setTxType(t)}
+                      className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${txType===t?'bg-primary text-white':'bg-white/[0.05] text-white/50 hover:text-white'}`}>
+                      {t==='lent'?'I Lent':'They Repaid'}
+                    </button>
+                  ))}
+                </div>
+                <Input type="number" placeholder={`Amount (${currency})`} step="0.01" value={txAmount}
+                  onChange={e => setTxAmount(e.target.value)} className="rounded-xl"/>
+                <Input placeholder="Note (optional)" value={txNote}
+                  onChange={e => setTxNote(e.target.value)} className="rounded-xl"/>
+                <Button onClick={addTransaction} disabled={!txAmount||parseFloat(txAmount)<=0||submitting} className="w-full rounded-xl">
+                  {submitting?<><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Recording…</>:'Record'}
+                </Button>
               </div>
+
+              {/* History */}
+              {selectedPerson.transactions.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-white/40 uppercase tracking-widest">History</p>
+                  {[...selectedPerson.transactions].reverse().map(t => (
+                    <div key={t.id} className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{background:'oklch(1 0 0 / 0.04)'}}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${t.type==='lent'?'bg-red-400/10':'bg-emerald-400/10'}`}>
+                        {t.type==='lent'?<TrendingUp className="w-3.5 h-3.5 text-red-400"/>:<TrendingDown className="w-3.5 h-3.5 text-emerald-400"/>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white">{t.type==='lent'?'You lent':'They repaid'}</p>
+                        {t.note && <p className="text-xs text-white/35 truncate">{t.note}</p>}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className={`text-sm font-bold ${t.type==='lent'?'text-red-400':'text-emerald-400'}`}>
+                          {t.type==='lent'?'-':'+'}{fmt(t.amount)}
+                        </p>
+                        <p className="text-[10px] text-white/25">
+                          {new Date(t.date).toLocaleDateString('default',{month:'short',day:'numeric'})}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </>
-      )}
-    </div>
-  );
-}
-
-function PersonDetail({ person, currency, transactionType, setTransactionType, transactionAmount, setTransactionAmount, transactionNote, setTransactionNote, onAdd, submitting }: {
-  person: Person; currency: string;
-  transactionType: 'lent' | 'repaid'; setTransactionType: (v: 'lent' | 'repaid') => void;
-  transactionAmount: string; setTransactionAmount: (v: string) => void;
-  transactionNote: string; setTransactionNote: (v: string) => void;
-  onAdd: () => void; submitting: boolean;
-}) {
-  return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className={`rounded-2xl p-4 border ${person.balance > 0 ? 'bg-green-500/10 border-green-500/20' : person.balance < 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-muted border-border'}`}>
-        <p className="text-xs text-muted-foreground font-medium">Current Balance</p>
-        <p className={`text-3xl font-bold mt-2 ${person.balance > 0 ? 'text-green-400' : person.balance < 0 ? 'text-red-400' : 'text-foreground'}`}>
-          {person.balance > 0 ? '+' : ''}{person.balance.toFixed(2)} {currency}
-        </p>
-        <p className="text-xs mt-2 text-muted-foreground">{person.balance > 0 ? 'They owe you' : person.balance < 0 ? 'You owe them' : 'Settled up'}</p>
-      </div>
-
-      <div className="space-y-4">
-        <h4 className="font-semibold text-foreground">Add Transaction</h4>
-        <div>
-          <label className="text-sm font-medium text-muted-foreground block mb-2">Type</label>
-          <select className="w-full px-3 py-3 rounded-lg border border-border bg-card text-foreground text-sm" value={transactionType} onChange={e => setTransactionType(e.target.value as 'lent' | 'repaid')}>
-            <option value="lent">I Lent Them</option>
-            <option value="repaid">They Repaid Me</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-muted-foreground block mb-2">Amount ({currency})</label>
-          <Input type="number" placeholder="0.00" step="0.01" className="rounded-lg" value={transactionAmount} onChange={e => setTransactionAmount(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-muted-foreground block mb-2">Note (Optional)</label>
-          <Input placeholder="e.g., Lunch, Movie" className="rounded-lg" value={transactionNote} onChange={e => setTransactionNote(e.target.value)} />
-        </div>
-        <Button className="w-full rounded-lg py-6 text-base" onClick={onAdd} disabled={!transactionAmount || parseFloat(transactionAmount) <= 0 || submitting}>
-          {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Recording…</> : 'Add Transaction'}
-        </Button>
-      </div>
-
-      {person.transactions.length > 0 && (
-        <div className="border-t border-border pt-6">
-          <h4 className="font-semibold text-foreground text-lg mb-4">History</h4>
-          <div className="space-y-3">
-            {person.transactions.map(t => (
-              <div key={t.id} className="p-4 bg-muted rounded-2xl">
-                <p className={`font-semibold text-base ${t.type === 'lent' ? 'text-red-400' : 'text-green-400'}`}>
-                  {t.type === 'lent' ? 'You Lent' : 'They Repaid'} {t.amount.toFixed(0)} {currency}
-                </p>
-                {t.note && <p className="text-sm text-muted-foreground mt-1">{t.note}</p>}
-                <p className="text-xs text-muted-foreground mt-2">{new Date(t.date).toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );
