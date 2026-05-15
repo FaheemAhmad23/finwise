@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, X, ChevronLeft, Loader2, TrendingUp, TrendingDown, Users } from 'lucide-react';
+import { Trash2, Plus, X, Loader2, TrendingUp, TrendingDown, Users, Wallet, PiggyBank, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface BalanceSummary { currentBalance: number; savingsBalance: number; }
 
 interface DebtTransaction { id: string; type: 'lent'|'repaid'; amount: number; note: string|null; date: string; }
 interface Person { id: string; name: string; balance: number; transactions: DebtTransaction[]; }
@@ -22,7 +24,10 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
   const [txType, setTxType]               = useState<'lent'|'repaid'>('lent');
   const [txAmount, setTxAmount]           = useState('');
   const [txNote, setTxNote]               = useState('');
+  const [fundingSource, setFundingSource] = useState<'current'|'savings'>('current');
+  const [repayToSavings, setRepayToSavings] = useState(false);
   const [submitting, setSubmitting]       = useState(false);
+  const [balanceData, setBalanceData]     = useState<BalanceSummary|null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,7 +36,12 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadBalance = useCallback(async () => {
+    try { const r = await fetch('/api/balance-summary'); setBalanceData(await r.json()); }
+    catch {}
+  }, []);
+
+  useEffect(() => { load(); loadBalance(); }, [load, loadBalance]);
 
   const addPerson = async () => {
     if (!newName.trim()) return;
@@ -47,13 +57,35 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
 
   const addTransaction = async () => {
     if (!selectedPerson || !txAmount || parseFloat(txAmount) <= 0) return;
+    const amt = parseFloat(txAmount);
+
+    // Low balance alert for loans
+    if (txType === 'lent' && balanceData) {
+      const available = fundingSource === 'savings' ? balanceData.savingsBalance : balanceData.currentBalance;
+      if (amt > available) {
+        const accountName = fundingSource === 'savings' ? 'Savings' : 'Current Balance';
+        toast.error(`Insufficient ${accountName} (${available.toLocaleString()} available). Please reduce amount or switch funding source.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
-      const r = await fetch(`/api/people/${selectedPerson.id}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:txType,amount:parseFloat(txAmount),note:txNote||null})});
+      const r = await fetch(`/api/people/${selectedPerson.id}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          type: txType, amount: amt, note: txNote||null,
+          fundingSource: txType==='lent' ? fundingSource : undefined,
+          repayToSavings: txType==='repaid' ? repayToSavings : undefined,
+        })
+      });
       const updated = await r.json();
       setPeople(prev => prev.map(p => p.id === updated.id ? updated : p));
       setSelectedPerson(updated); setTxAmount(''); setTxNote('');
-      toast.success('Recorded'); onUpdate();
+      await loadBalance();
+      toast.success(txType==='repaid' ? `+${amt.toLocaleString()} returned to your ${repayToSavings?'savings':'current'} account` : 'Loan recorded');
+      onUpdate();
     } catch { toast.error('Failed'); }
     finally { setSubmitting(false); }
   };
@@ -230,14 +262,73 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
                     </button>
                   ))}
                 </div>
+
                 <Input type="number" placeholder={`Amount (${currency})`} step="0.01" value={txAmount}
                   onChange={e => setTxAmount(e.target.value)} className="rounded-xl"/>
+
+                {/* Funding Source — only when lending */}
+                {txType === 'lent' && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-white/40">Fund this loan from:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setFundingSource('current')}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${fundingSource==='current'?'border-primary bg-primary/15 text-white':'border-white/[0.07] bg-white/[0.03] text-white/40 hover:text-white'}`}>
+                        <Wallet className="w-3.5 h-3.5"/>
+                        <div className="text-left">
+                          <p>Current</p>
+                          <p className="text-[10px] font-normal opacity-60">{balanceData ? fmt(balanceData.currentBalance) : '—'} {currency}</p>
+                        </div>
+                      </button>
+                      <button onClick={() => setFundingSource('savings')}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${fundingSource==='savings'?'border-emerald-500 bg-emerald-500/10 text-emerald-400':'border-white/[0.07] bg-white/[0.03] text-white/40 hover:text-white'}`}>
+                        <PiggyBank className="w-3.5 h-3.5"/>
+                        <div className="text-left">
+                          <p>Savings</p>
+                          <p className="text-[10px] font-normal opacity-60">{balanceData ? fmt(balanceData.savingsBalance) : '—'} {currency}</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Balance warning */}
+                    {txAmount && balanceData && parseFloat(txAmount) > 0 && (() => {
+                      const available = fundingSource==='savings' ? balanceData.savingsBalance : balanceData.currentBalance;
+                      return parseFloat(txAmount) > available ? (
+                        <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-400/5 border border-amber-400/15">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5"/>
+                          <p className="text-[11px] text-amber-400/80">
+                            Insufficient {fundingSource==='savings'?'savings':'current balance'}.
+                            Available: <strong>{fmt(available)} {currency}</strong>
+                          </p>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+
+                {/* Repay to savings toggle — only when repaid */}
+                {txType === 'repaid' && balanceData && balanceData.savingsBalance > 0 && (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                    <div className="flex items-center gap-2">
+                      <PiggyBank className="w-4 h-4 text-emerald-400/70"/>
+                      <div>
+                        <p className="text-xs font-medium text-white">Return to Savings?</p>
+                        <p className="text-[10px] text-white/35">Adds repayment to savings account</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setRepayToSavings(v => !v)}
+                      className={`w-10 h-5 rounded-full transition-all ${repayToSavings?'bg-emerald-500':'bg-white/10'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${repayToSavings?'translate-x-5':'translate-x-0.5'}`}/>
+                    </button>
+                  </div>
+                )}
+
                 <Input placeholder="Note (optional)" value={txNote}
                   onChange={e => setTxNote(e.target.value)} className="rounded-xl"/>
                 <Button onClick={addTransaction} disabled={!txAmount||parseFloat(txAmount)<=0||submitting} className="w-full rounded-xl">
-                  {submitting?<><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Recording…</>:'Record'}
+                  {submitting?<><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Recording…</>:txType==='lent'?`Lend from ${fundingSource==='savings'?'Savings':'Current'}`:'Record Repayment'}
                 </Button>
               </div>
+
 
               {/* History */}
               {selectedPerson.transactions.length > 0 && (

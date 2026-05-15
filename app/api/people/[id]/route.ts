@@ -52,28 +52,37 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { type, amount, note, date } = await req.json();
+    const { type, amount, note, date, fundingSource, repayToSavings } = await req.json();
 
     if (!type || !amount) {
       return NextResponse.json({ error: 'type and amount are required' }, { status: 400 });
     }
 
-    const parsedAmount  = parseFloat(amount);
-    const today         = date ? new Date(date) : new Date();
-    const balanceDelta  = type === 'lent' ? parsedAmount : -parsedAmount;
+    const parsedAmount = parseFloat(amount);
+    const today        = date ? new Date(date) : new Date();
+    const balanceDelta = type === 'lent' ? parsedAmount : -parsedAmount;
+
+    // Encode funding/repay source into description so balance-summary can calculate correctly
+    let enhancedNote = note || null;
+    if (type === 'lent' && fundingSource === 'savings') {
+      enhancedNote = `[SRC:savings]${note ? ' ' + note : ''}`;
+    }
+    if (type === 'repaid' && repayToSavings) {
+      enhancedNote = `[TO:savings]${note ? ' ' + note : ''}`;
+    }
 
     // Mirror into the main transaction ledger
     const expenseTx = await prisma.transaction.create({
       data: {
         userId,
-        type:             type === 'lent' ? 'expense' : 'income',
-        category:         type === 'lent' ? 'Lent Money' : 'Debt Repaid',
-        amount:           parsedAmount,
+        type:              type === 'lent' ? 'expense' : 'income',
+        category:          type === 'lent' ? 'Lent Money' : 'Debt Repaid',
+        amount:            parsedAmount,
         currency,
-        date:             today,
-        description:      note || null,
+        date:              today,
+        description:       enhancedNote,
         isDebtTransaction: true,
-        personName:       person.name,
+        personName:        person.name,
       },
     });
 
