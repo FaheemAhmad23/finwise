@@ -158,7 +158,7 @@ export default function BillSplit({ onUpdate }: BillSplitProps) {
 
           <div className="space-y-2">
             {results.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-card rounded-xl border border-green-500/20">
+              <div key={i} className="flex items-center justify-between p-3 glass rounded-xl border border-green-500/20">
                 <span className="font-medium text-foreground">{r.name}</span>
                 <span className="text-lg font-bold text-green-400">{r.share.toFixed(2)} {currency}</span>
               </div>

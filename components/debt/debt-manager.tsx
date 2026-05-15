@@ -150,12 +150,12 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
             <p className="text-sm">{searchTerm ? 'No person found' : 'Add someone to track debts with'}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-border">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-white/[0.06]">
             {filteredPeople.map(person => (
               <div key={person.id} className="relative group">
                 <button
                   onClick={() => { setSelectedPerson(person); setTransactionType('lent'); setTransactionAmount(''); setTransactionNote(''); }}
-                  className={`w-full p-3 md:p-4 text-left transition-colors hover:bg-muted/60 ${person.balance > 0 ? 'hover:bg-green-500/10' : person.balance < 0 ? 'hover:bg-red-500/10' : ''}`}
+                  className={`w-full p-3 md:p-4 text-left transition-colors hover:bg-white/[0.05] ${person.balance > 0 ? 'hover:bg-green-500/10' : person.balance < 0 ? 'hover:bg-red-500/10' : ''}`}
                 >
                   <p className="font-semibold text-sm md:text-base truncate text-foreground">{person.name}</p>
                   <p className={`text-lg md:text-2xl font-bold mt-2 ${person.balance > 0 ? 'text-green-400' : person.balance < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
@@ -177,7 +177,7 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
         <>
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSelectedPerson(null)} />
           <div className="md:hidden fixed inset-0 z-50 bg-card overflow-y-auto flex flex-col">
-            <div className="sticky top-0 bg-card p-4 border-b border-border flex items-center justify-between shadow-sm">
+            <div className="sticky top-0 bg-card p-4 border-b border-white/[0.06] flex items-center justify-between shadow-sm">
               <button onClick={() => setSelectedPerson(null)}><ChevronLeft className="w-6 h-6" /></button>
               <h3 className="text-lg font-bold">{selectedPerson.name}</h3>
               <div className="w-6" />
@@ -187,7 +187,7 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
 
           <div className="hidden md:flex fixed inset-0 bg-black/60 z-50 items-center justify-center p-4" onClick={() => setSelectedPerson(null)}>
             <div className="bg-card rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-border" onClick={e => e.stopPropagation()}>
-              <div className="p-6 border-b border-border flex items-center justify-between">
+              <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
                 <h3 className="text-2xl font-bold">{selectedPerson.name}</h3>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedPerson(null)} className="h-8 w-8 p-0"><X className="w-5 h-5" /></Button>
               </div>

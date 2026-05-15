@@ -2,201 +2,228 @@
 
 import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
 import ExpenseManager from '@/components/expense/expense-manager';
 import DebtManager from '@/components/debt/debt-manager';
 import BillSplit from '@/components/bill/bill-split';
 import ClientsManager from '@/components/clients/clients-manager';
 import {
-  LayoutDashboard, Users, CreditCard, SplitSquareVertical,
+  BarChart3, Users, CreditCard, Scissors,
   LogOut, Download, Menu, X, ChevronRight,
 } from 'lucide-react';
 
 const NAV = [
-  { id: 'expenses', label: 'Expenses',   emoji: '📊' },
-  { id: 'clients',  label: 'Clients',    emoji: '👥' },
-  { id: 'debts',    label: 'Debts',      emoji: '💳' },
-  { id: 'bills',    label: 'Bill Split', emoji: '💸' },
+  { id: 'expenses', label: 'Expenses',   icon: BarChart3,   emoji: '📊' },
+  { id: 'clients',  label: 'Clients',    icon: Users,       emoji: '👥' },
+  { id: 'debts',    label: 'Debts',      icon: CreditCard,  emoji: '💳' },
+  { id: 'bills',    label: 'Bill Split', icon: Scissors,    emoji: '💸' },
 ];
 
+const PAGE_DESC: Record<string, string> = {
+  expenses: 'Track your income and spending',
+  clients:  'Manage your client directory',
+  debts:    'Track money owed between people',
+  bills:    'Split bills equally among friends',
+};
+
 export default function Home() {
-  const { data: session } = useSession();
+  const { data: session }           = useSession();
   const [page, setPage]             = useState('expenses');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
   const currency = (session?.user as any)?.currency || 'PKR';
 
-  const handleRefresh = () => setRefreshTrigger(p => p + 1);
+  const navigate = (id: string) => { setPage(id); setDrawerOpen(false); };
+  const refresh  = () => setRefreshKey(k => k + 1);
 
-  const navigate = (id: string) => {
-    setPage(id);
-    setDrawerOpen(false);
-  };
-
-  const handleExportCSV = () => {
-    const now   = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    window.location.href = `/api/export?format=csv&month=${month}`;
+  const handleExport = () => {
+    const now = new Date();
+    window.location.href = `/api/export?format=csv&month=${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   };
 
   const current = NAV.find(n => n.id === page)!;
 
-  const PAGE_DESC: Record<string, string> = {
-    expenses: 'Track your income and expenses',
-    clients:  'Manage your client directory',
-    debts:    'Track money owed between people',
-    bills:    'Split bills equally among friends',
-  };
-
-  return (
-    <div className="min-h-screen bg-background flex">
-
-      {/* ── Desktop Sidebar ─────────────────────────────────── */}
-      <aside className="hidden md:flex flex-col w-56 bg-card border-r border-border fixed top-0 left-0 h-full z-30">
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">💰</span>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-none">FinWise</p>
-              <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Pro</p>
-            </div>
+  /* ── Sidebar content (shared desktop + mobile) ── */
+  const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
+    <>
+      {/* Logo */}
+      <div className={`${mobile ? 'p-5' : 'p-6'} border-b border-white/[0.06]`}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center glow-indigo-sm">
+            <span className="text-lg">💰</span>
           </div>
-          {session?.user && (
-            <p className="text-xs text-muted-foreground mt-3 truncate">
+          <div>
+            <p className="font-bold text-white leading-none tracking-wide">FinWise</p>
+            <p className="text-[9px] font-bold tracking-[0.2em] text-indigo-400 uppercase mt-0.5">Pro</p>
+          </div>
+        </div>
+        {session?.user && (
+          <div className="mt-4">
+            <p className="text-xs text-white/40">Welcome back</p>
+            <p className="text-sm font-semibold text-white/90 truncate mt-0.5">
               {session.user.name || session.user.email}
             </p>
-          )}
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1">
-          {NAV.map(item => {
-            const active = page === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  active
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                }`}
-              >
-                <span className="text-base">{item.emoji}</span>
-                {item.label}
-                {active && <ChevronRight className="w-4 h-4 ml-auto opacity-70" />}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-border space-y-1">
-          <button
-            onClick={handleExportCSV}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
-          >
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-          >
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Mobile Drawer Overlay ───────────────────────────── */}
-      {drawerOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setDrawerOpen(false)} />
-      )}
-
-      {/* ── Mobile Drawer ───────────────────────────────────── */}
-      <div className={`fixed top-0 left-0 h-full w-64 bg-card border-r border-border z-50 transform transition-transform duration-300 md:hidden ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-5 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">💰</span>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-none">FinWise</p>
-              <p className="text-[10px] font-bold tracking-widest text-primary uppercase">Pro</p>
+            <div className="inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-full bg-white/5 border border-white/8">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="text-[10px] text-white/50 font-medium">{currency}</span>
             </div>
           </div>
-          <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {session?.user && (
-          <div className="px-5 py-3 border-b border-border">
-            <p className="text-xs text-muted-foreground">Signed in as</p>
-            <p className="text-sm font-medium text-foreground truncate">{session.user.name || session.user.email}</p>
-            <p className="text-xs text-muted-foreground">{currency}</p>
-          </div>
         )}
-
-        <nav className="p-3 space-y-1">
-          {NAV.map(item => {
-            const active = page === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                }`}
-              >
-                <span className="text-lg">{item.emoji}</span>
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border space-y-1">
-          <button
-            onClick={handleExportCSV}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
-          >
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-          >
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
-        </div>
       </div>
 
-      {/* ── Main Content ────────────────────────────────────── */}
-      <main className="flex-1 md:ml-56 min-h-screen flex flex-col">
-        {/* Mobile Top Bar */}
-        <header className="md:hidden sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setDrawerOpen(true)} className="p-2 rounded-xl hover:bg-muted transition-colors">
-            <Menu className="w-5 h-5 text-foreground" />
+      {/* Nav */}
+      <nav className="flex-1 p-3 space-y-1">
+        <p className="text-[10px] font-bold tracking-[0.15em] text-white/25 uppercase px-3 mb-3">Main Menu</p>
+        {NAV.map(item => {
+          const active = page === item.id;
+          const Icon   = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => navigate(item.id)}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                active
+                  ? 'nav-active'
+                  : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
+              }`}
+            >
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${active ? 'text-indigo-300' : 'text-white/30 group-hover:text-white/60'}`} />
+              <span>{item.label}</span>
+              {active && <ChevronRight className="w-3.5 h-3.5 ml-auto text-indigo-400/60" />}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bottom */}
+      <div className="p-3 border-t border-white/[0.05] space-y-1">
+        <button
+          onClick={handleExport}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm text-white/35 hover:text-white/70 hover:bg-white/[0.04] transition-all"
+        >
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm text-white/35 hover:text-red-400 hover:bg-red-500/[0.08] transition-all"
+        >
+          <LogOut className="w-4 h-4" /> Sign Out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background flex relative overflow-hidden">
+
+      {/* ── Background Glow Orbs ───────────────────────────── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Top-left indigo glow */}
+        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)' }} />
+        {/* Bottom-right purple glow */}
+        <div className="absolute -bottom-48 -right-32 w-[600px] h-[600px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.13) 0%, transparent 70%)' }} />
+        {/* Center-right blue glow */}
+        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[300px] h-[300px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)' }} />
+      </div>
+
+      {/* ── Desktop Sidebar ────────────────────────────────── */}
+      <aside className="hidden md:flex flex-col w-60 fixed top-0 left-0 h-full z-30"
+        style={{
+          background: 'linear-gradient(180deg, rgba(8,8,28,0.92) 0%, rgba(5,5,18,0.95) 100%)',
+          backdropFilter: 'blur(24px)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* ── Mobile Overlay ─────────────────────────────────── */}
+      {drawerOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setDrawerOpen(false)} />
+      )}
+
+      {/* ── Mobile Drawer ──────────────────────────────────── */}
+      <div className={`fixed top-0 left-0 h-full w-64 z-50 flex flex-col transform transition-transform duration-300 ease-out md:hidden ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          background: 'linear-gradient(180deg, rgba(8,8,28,0.98) 0%, rgba(5,5,18,0.99) 100%)',
+          backdropFilter: 'blur(32px)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <div className="flex items-center justify-between px-4 pt-4">
+          <div /> {/* spacer */}
+          <button onClick={() => setDrawerOpen(false)}
+            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors ml-auto">
+            <X className="w-4 h-4 text-white/50" />
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">💰</span>
-            <span className="font-bold text-foreground text-sm">FinWise</span>
-            <span className="text-[9px] font-bold tracking-widest text-primary uppercase">Pro</span>
+        </div>
+        <SidebarContent mobile />
+      </div>
+
+      {/* ── Main Content ───────────────────────────────────── */}
+      <main className="flex-1 md:ml-60 min-h-screen flex flex-col relative z-10">
+
+        {/* Mobile top bar */}
+        <header className="md:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3"
+          style={{
+            background: 'rgba(3,3,15,0.85)',
+            backdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+          }}
+        >
+          <button onClick={() => setDrawerOpen(true)}
+            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
+            <Menu className="w-5 h-5 text-white/70" />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+              <span className="text-sm">💰</span>
+            </div>
+            <span className="font-bold text-white text-sm tracking-wide">FinWise</span>
+            <span className="text-[9px] font-bold tracking-[0.15em] text-indigo-400 uppercase">Pro</span>
           </div>
           <div className="w-9" />
         </header>
 
-        {/* Page */}
-        <div className="flex-1 p-4 md:p-8 max-w-4xl w-full mx-auto">
-          <div className="mb-6 hidden md:block">
-            <h1 className="text-2xl font-bold text-foreground">{current.emoji} {current.label}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{PAGE_DESC[page]}</p>
+        {/* Page body */}
+        <div className="flex-1 p-4 md:p-8 max-w-5xl w-full mx-auto">
+
+          {/* Desktop page header */}
+          <div className="hidden md:flex items-end justify-between mb-8">
+            <div>
+              <p className="text-white/30 text-xs font-medium uppercase tracking-widest mb-1">
+                {current.emoji} {current.label}
+              </p>
+              <h1 className="text-3xl font-bold text-white leading-none">
+                {PAGE_DESC[page]}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-white/30">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Live
+            </div>
           </div>
 
-          <div className="bg-card rounded-2xl border border-border p-4 md:p-6">
-            {page === 'expenses' && <ExpenseManager key={refreshTrigger} onUpdate={handleRefresh} />}
-            {page === 'clients'  && <ClientsManager key={refreshTrigger} onUpdate={handleRefresh} />}
-            {page === 'debts'    && <DebtManager    key={refreshTrigger} onUpdate={handleRefresh} />}
-            {page === 'bills'    && <BillSplit       key={refreshTrigger} onUpdate={handleRefresh} />}
+          {/* Glass content card */}
+          <div className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              backdropFilter: 'blur(24px)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
+            }}
+          >
+            <div className="p-4 md:p-6">
+              {page === 'expenses' && <ExpenseManager key={refreshKey} onUpdate={refresh} />}
+              {page === 'clients'  && <ClientsManager key={refreshKey} onUpdate={refresh} />}
+              {page === 'debts'    && <DebtManager    key={refreshKey} onUpdate={refresh} />}
+              {page === 'bills'    && <BillSplit       key={refreshKey} onUpdate={refresh} />}
+            </div>
           </div>
+
         </div>
       </main>
     </div>

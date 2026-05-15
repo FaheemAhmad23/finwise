@@ -136,17 +136,17 @@ export default function ClientsManager({ onUpdate }: { onUpdate: () => void }) {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        <div className="glass rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-foreground">{clients.length}</p>
           <p className="text-xs text-muted-foreground mt-1">Total Clients</p>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        <div className="glass rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-primary">
             {clients.reduce((s, c) => s + (c._count?.invoices || 0), 0)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Total Invoices</p>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
+        <div className="glass rounded-xl p-4 text-center">
           <p className="text-2xl font-bold text-green-400">
             {clients.filter(c => (c._count?.invoices || 0) > 0).length}
           </p>
@@ -174,7 +174,7 @@ export default function ClientsManager({ onUpdate }: { onUpdate: () => void }) {
             <div
               key={client.id}
               onClick={() => setSelected(selected?.id === client.id ? null : client)}
-              className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/40 transition-all group"
+              className="glass rounded-xl p-4 cursor-pointer hover:border-primary/40 transition-all group"
             >
               <div className="flex items-start justify-between gap-3">
                 {/* Avatar + Info */}

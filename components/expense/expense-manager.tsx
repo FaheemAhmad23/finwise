@@ -287,7 +287,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
 
       {/* Transactions */}
       <div className="rounded-3xl border border-border bg-card overflow-hidden mx-4 md:mx-0">
-        <div className="p-4 md:p-6 border-b border-border flex items-center justify-between">
+        <div className="p-4 md:p-6 border-b border-white/[0.06] flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-foreground text-sm md:text-base">Transactions</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} this month</p>
@@ -355,11 +355,11 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
             <p className="text-xs text-muted-foreground mt-1">Tap + to add your first transaction</p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.06]">
             {[...expenses]
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((trans) => (
-                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
+                <div key={trans.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-white/[0.04] transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-foreground text-sm truncate">{trans.category}</p>
