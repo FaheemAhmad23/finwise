@@ -35,6 +35,11 @@ export default function Home() {
     window.location.href = `/api/export?format=csv&month=${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   };
 
+  const handleExportPdf = () => {
+    const now = new Date();
+    window.location.href = `/api/export?format=pdf&month=${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  };
+
   const userName     = session?.user?.name?.split(' ')[0] || 'there';
   const userInitials = (session?.user?.name || session?.user?.email || 'U')
     .split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -71,6 +76,12 @@ export default function Home() {
         className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm text-white/35 hover:text-white/70 hover:bg-white/[0.05] transition-all"
       >
         <Download className="w-4 h-4" /> Export CSV
+      </button>
+      <button
+        onClick={handleExportPdf}
+        className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm text-white/35 hover:text-purple-400 hover:bg-purple-500/[0.08] transition-all"
+      >
+        <Download className="w-4 h-4" /> Export PDF
       </button>
       <button
         onClick={() => signOut({ callbackUrl: '/login' })}
@@ -201,6 +212,10 @@ export default function Home() {
             <button onClick={handleExport}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-white/40 hover:text-white hover:bg-white/[0.06] transition-all border border-white/[0.07]">
               <Download className="w-3.5 h-3.5" /> Export CSV
+            </button>
+            <button onClick={handleExportPdf}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-purple-400/70 hover:text-purple-300 hover:bg-purple-500/[0.10] transition-all border border-purple-500/[0.20]">
+              <Download className="w-3.5 h-3.5" /> Export PDF
             </button>
             <div className="flex items-center gap-2.5 pl-3 border-l border-white/[0.07]">
               <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center text-white text-xs font-bold">
