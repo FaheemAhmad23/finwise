@@ -116,15 +116,46 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
   return (
     <div className="space-y-5">
 
-      {/* ── Hero + Side Stats ──────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Net hero */}
+      {/* ── Hero Stats Grid ──────────────────────────────── */}
+      {/* Mobile: 2-col grid — net hero full, then owed+owe side by side */}
+      <div className="grid grid-cols-2 md:hidden gap-3">
+        <div className="col-span-2 relative overflow-hidden rounded-2xl p-4"
+          style={{background:'linear-gradient(135deg, oklch(0.17 0.008 265) 0%, oklch(0.13 0.006 265) 100%)',border:'1px solid oklch(1 0 0 / 0.08)',boxShadow:'0 4px 24px oklch(0 0 0 / 0.35)'}}>
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
+            style={{background: netBalance>0?'radial-gradient(circle,#4ade80,transparent)':'radial-gradient(circle,#f87171,transparent)',filter:'blur(30px)'}}/>
+          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Net Position</p>
+          <p className={`text-3xl font-black leading-none mb-1 ${netBalance>0?'text-emerald-400':netBalance<0?'text-red-400':'text-white/60'}`}>
+            {netBalance>0?'+':''}{fmt(netBalance)}
+          </p>
+          <p className="text-xs text-white/30 font-medium">{currency}</p>
+          <div className="mt-3">
+            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${netBalance>0?'bg-emerald-400/10 text-emerald-400':netBalance<0?'bg-red-400/10 text-red-400':'bg-white/5 text-white/40'}`}>
+              {netBalance>0?'You are owed':netBalance<0?'You owe':'All balanced'}
+            </span>
+          </div>
+        </div>
+        <div className="rounded-2xl p-3 relative overflow-hidden"
+          style={{background:'oklch(0.72 0.18 150 / 0.10)',border:'1px solid oklch(0.72 0.18 150 / 0.18)'}}>
+          <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Owed to You</p>
+          <p className="text-lg font-black text-emerald-400 leading-none">{fmt(totalOwed)}</p>
+          <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+        </div>
+        <div className="rounded-2xl p-3 relative overflow-hidden"
+          style={{background:'oklch(0.62 0.22 27 / 0.10)',border:'1px solid oklch(0.62 0.22 27 / 0.18)'}}>
+          <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-1.5">You Owe</p>
+          <p className="text-lg font-black text-red-400 leading-none">{fmt(totalOwe)}</p>
+          <p className="text-[10px] text-white/25 mt-0.5">{currency}</p>
+        </div>
+      </div>
+
+      {/* Desktop: 3-col — hero takes 2 cols, stacked stats on right */}
+      <div className="hidden md:grid grid-cols-3 gap-3">
         <div className="col-span-2 relative overflow-hidden rounded-2xl p-5"
           style={{background:'linear-gradient(135deg, oklch(0.17 0.008 265) 0%, oklch(0.13 0.006 265) 100%)',border:'1px solid oklch(1 0 0 / 0.08)',boxShadow:'0 4px 24px oklch(0 0 0 / 0.35)'}}>
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
             style={{background: netBalance>0?'radial-gradient(circle,#4ade80,transparent)':'radial-gradient(circle,#f87171,transparent)',filter:'blur(30px)'}}/>
           <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Net Position</p>
-          <p className={`text-3xl md:text-4xl font-black leading-none mb-1 ${netBalance>0?'text-emerald-400':netBalance<0?'text-red-400':'text-white/60'}`}>
+          <p className={`text-4xl font-black leading-none mb-1 ${netBalance>0?'text-emerald-400':netBalance<0?'text-red-400':'text-white/60'}`}>
             {netBalance>0?'+':''}{fmt(netBalance)}
           </p>
           <p className="text-sm text-white/30 font-medium">{currency}</p>
@@ -134,8 +165,6 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
             </span>
           </div>
         </div>
-
-        {/* Side stats */}
         <div className="flex flex-col gap-3">
           <div className="flex-1 rounded-2xl p-4 relative overflow-hidden"
             style={{background:'oklch(0.72 0.18 150 / 0.10)',border:'1px solid oklch(0.72 0.18 150 / 0.18)'}}>
@@ -153,6 +182,7 @@ export default function DebtManager({ onUpdate }: { onUpdate: () => void }) {
           </div>
         </div>
       </div>
+
 
       {/* ── Add Person ─────────────────────────────────────── */}
       <div className="flex gap-2">

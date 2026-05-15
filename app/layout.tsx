@@ -1,14 +1,22 @@
 import type { Metadata } from 'next';
-import { Manrope } from 'next/font/google';
+import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { Toaster } from 'sonner';
 import { SessionProviderWrapper } from '@/components/session-provider';
 import './globals.css';
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-manrope',
-  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-inter',
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+  weight: ['500', '600', '700', '800'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -37,7 +45,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     // Force dark class — app is always dark themed
-    <html lang="en" className={`${manrope.variable} dark`}>
+    <html lang="en" className={`${inter.variable} ${jakarta.variable} dark`}>
       <body className="font-sans antialiased bg-background text-foreground">
         <SessionProviderWrapper>
           {children}

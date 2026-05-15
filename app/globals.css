@@ -81,8 +81,10 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-manrope), 'Manrope', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', monospace;
+  /* Inter = body/UI, Jakarta = display/numbers */
+  --font-sans:    var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-display: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono:    'Geist Mono', monospace;
   --color-background:              var(--background);
   --color-foreground:              var(--foreground);
   --color-card:                    var(--card);
@@ -125,8 +127,19 @@
   * { @apply border-border; box-sizing: border-box; }
   html, body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1, "cv02" 1, "cv03" 1, "cv04" 1;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Big numbers use Jakarta for more character */
+  .font-black, .text-3xl, .text-4xl, .text-2xl {
+    font-family: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+    letter-spacing: -0.015em;
   }
 }
 

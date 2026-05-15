@@ -144,11 +144,11 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
   return (
     <div className="space-y-5">
 
-      {/* ── Three Hero Account Cards ────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* ── Hero Stats Grid ────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
 
-        {/* Current Balance — orange hero */}
-        <div className="relative overflow-hidden rounded-2xl p-5"
+        {/* Current Balance — full row on mobile (col-span-2), 1/3 on desktop */}
+        <div className="col-span-2 md:col-span-1 relative overflow-hidden rounded-2xl p-4 md:p-5"
           style={{background:'linear-gradient(135deg, oklch(0.65 0.195 34) 0%, oklch(0.52 0.18 30) 100%)',boxShadow:'0 8px 32px oklch(0.65 0.195 34 / 0.40)'}}>
           <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-20"
             style={{background:'radial-gradient(circle,white,transparent)',filter:'blur(20px)'}}/>
@@ -166,7 +166,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
         </div>
 
         {/* Savings Account — green */}
-        <div className="relative overflow-hidden rounded-2xl p-5"
+        <div className="col-span-1 relative overflow-hidden rounded-2xl p-4 md:p-5"
           style={{background:'oklch(0.72 0.18 150 / 0.12)',border:'1px solid oklch(0.72 0.18 150 / 0.22)',boxShadow:'0 4px 24px oklch(0 0 0 / 0.30)'}}>
           <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10"
             style={{background:'radial-gradient(circle,#4ade80,transparent)',filter:'blur(15px)'}}/>
@@ -184,7 +184,7 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
         </div>
 
         {/* This Month Summary */}
-        <div className="rounded-2xl p-4 space-y-3"
+        <div className="col-span-1 rounded-2xl p-4 space-y-3"
           style={{background:'oklch(0.13 0.006 260)',border:'1px solid oklch(1 0 0 / 0.08)'}}>
           <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">This Month</p>
           <div className="space-y-2">
