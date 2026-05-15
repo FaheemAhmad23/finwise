@@ -511,7 +511,6 @@ export default function ExpenseManager({ onUpdate }: { onUpdate: () => void }) {
           </div>
         )}
       </div>
-      </div>
 
       {/* ── Withdraw from Savings Modal ──────────────────── */}
       {withdrawOpen && (
