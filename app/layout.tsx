@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { Toaster } from 'sonner';
-import { SessionProviderWrapper } from '@/components/session-provider';
 import './globals.css';
 
 const inter = Inter({
@@ -20,16 +19,10 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'FinWise — Smart Money Manager',
+  title: 'FinWise — Offline Money Manager',
   description:
-    'Track expenses, manage debts, split bills, and hit your savings goals — all in one beautifully simple app. Free forever.',
-  keywords: 'expense tracker, budget planner, debt tracker, bill splitter, money manager, personal finance',
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  openGraph: {
-    title: 'FinWise — Smart Money Manager',
-    description: 'Know where every rupee goes. Plan where every dollar lands.',
-    type: 'website',
-  },
+    'Track expenses, manage debts, split bills offline. All data saved locally on your device. No login required.',
+  keywords: 'expense tracker, budget planner, debt tracker, bill splitter, money manager, offline, personal finance',
   icons: {
     icon: [
       { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
@@ -44,14 +37,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // Force dark class — app is always dark themed
     <html lang="en" className={`${inter.variable} ${jakarta.variable} dark`}>
       <body className="font-sans antialiased bg-background text-foreground">
-        <SessionProviderWrapper>
-          {children}
-          <Toaster richColors position="top-right" theme="dark" />
-          {process.env.NODE_ENV === 'production' && <Analytics />}
-        </SessionProviderWrapper>
+        {children}
+        <Toaster richColors position="top-right" theme="dark" />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   );
